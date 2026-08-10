@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { IconList, IconMapPin, IconPencil, IconShare } from "@/components/ui/icons";
 import type { BookData } from "@/lib/types";
 import { getTheme } from "@/lib/themes";
 import { CuteBackdrop } from "./CuteBackdrop";
-import { FlipBook, type FlipBookHandle } from "./FlipBook";
+import { FlipBook, type FlipBookHandle, type FlipOrientation } from "./FlipBook";
 import { MusicToggle } from "./MusicToggle";
 import { renderLayout } from "./layouts";
 import { PageNav } from "./PageNav";
@@ -24,9 +24,14 @@ export default function BookReader({
 }) {
   const theme = getTheme(book.theme);
   const { pages } = book;
-  const meta = { title: book.title, subtitle: book.subtitle };
+  // Stable identity: FlipBook memoizes its children on this (see FlipBook).
+  const meta = useMemo(
+    () => ({ title: book.title, subtitle: book.subtitle }),
+    [book.title, book.subtitle],
+  );
 
   const [isSpread, setIsSpread] = useState(false);
+  const [orientation, setOrientation] = useState<FlipOrientation>("landscape");
   const [start, setStart] = useState(initialPage);
   const [dir, setDir] = useState(1);
   const [tocOpen, setTocOpen] = useState(false);
@@ -35,32 +40,39 @@ export default function BookReader({
   const touchX = useRef<number | null>(null);
   const flipRef = useRef<FlipBookHandle | null>(null);
 
-  // 3D page-flip on md+; fall back to fade-slide when motion is reduced.
-  const flipMode = isSpread && !reducedMotion;
-  const perView = isSpread ? 2 : 1;
+  // Real 3D page-flip everywhere — StPageFlip switches to single-page
+  // (portrait) on narrow screens by itself. Only reduced motion falls back
+  // to the fade-slide reader, and that swap waits for mount: the server
+  // can't know the preference, so deciding during render would desync
+  // hydration.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const flipMode = mounted ? !reducedMotion : true;
+  const isPortrait = orientation === "portrait";
+  const perView = isSpread && !flipMode ? 2 : 1;
 
-  // With showCover, valid flip views start at 0, odd indices, and the last
-  // page — normalize deep-link targets so StPageFlip lands on a real spread.
-  const flipInitial =
-    initialPage === 0 ? 0 : initialPage % 2 === 1 ? initialPage : initialPage - 1;
+  // Landscape pairs pages (1,2)(3,4)… so only 0 and odd indices are valid
+  // view starts; portrait shows every page on its own. Normalizing with the
+  // wrong grid corrupts deep-linked positions.
+  const toFlipIndex = useCallback(
+    (i: number) => (isPortrait ? i : i === 0 ? 0 : i % 2 === 1 ? i : i - 1),
+    [isPortrait],
+  );
+  const flipInitial = toFlipIndex(initialPage);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
-    const apply = () => {
-      setIsSpread(mq.matches);
-      // Align to the mode's spread grid: fade-slide pairs (0,1)(2,3)… so
-      // even starts; the flip book (showCover) pairs (1,2)(3,4)… so odd
-      // starts. Using the wrong grid corrupts deep-linked positions.
-      if (mq.matches) {
-        setStart((s) =>
-          reducedMotion ? s - (s % 2) : s === 0 ? 0 : s % 2 === 1 ? s : s - 1,
-        );
-      }
-    };
+    const apply = () => setIsSpread(mq.matches);
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
-  }, [reducedMotion]);
+  }, []);
+
+  // Re-align the current position whenever the active grid changes.
+  useEffect(() => {
+    if (flipMode) setStart((s) => toFlipIndex(s));
+    else setStart((s) => (isSpread ? s - (s % 2) : s));
+  }, [flipMode, isSpread, toFlipIndex]);
 
   // Follow ?page= even when this instance is reused (e.g. a map pin pushes a
   // new search param onto the same route). Runs after FlipBook's own init, so
@@ -84,7 +96,7 @@ export default function BookReader({
       setStart(isSpread ? initialPage - (initialPage % 2) : initialPage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPage, flipMode]);
+  }, [initialPage, flipMode, isPortrait]);
 
   const next = useCallback(() => {
     if (flipMode) {
@@ -119,13 +131,13 @@ export default function BookReader({
     (i: number) => {
       setTocOpen(false);
       if (flipMode) {
-        flipRef.current?.pageFlip().turnToPage(i === 0 ? 0 : i % 2 === 1 ? i : i - 1);
+        flipRef.current?.pageFlip()?.turnToPage(toFlipIndex(i));
         return;
       }
       setDir(i >= start ? 1 : -1);
       setStart(isSpread ? i - (i % 2) : i);
     },
-    [flipMode, isSpread, start],
+    [flipMode, isSpread, start, toFlipIndex],
   );
 
   async function share() {
@@ -155,18 +167,22 @@ export default function BookReader({
   }
 
   const canPrev = start > 0;
-  // Flip mode: last spread starts at len-1 (even books, filler added) or
-  // len-2 (odd books).
+  // Landscape: last view starts at len-1 (even books, filler added) or len-2
+  // (odd books). Portrait advances one page at a time.
   const canNext = flipMode
-    ? start === 0
-      ? pages.length > 1
-      : start + 2 < pages.length
+    ? isPortrait
+      ? start < pages.length - 1
+      : start === 0
+        ? pages.length > 1
+        : start + 2 < pages.length
     : start + perView < pages.length;
   const visible = pages.slice(start, start + perView);
   const label =
-    !flipMode && isSpread && visible.length === 2
+    flipMode && !isPortrait && start > 0 && start + 1 < pages.length
       ? `hal. ${start + 1}–${start + 2} / ${pages.length}`
-      : `hal. ${start + 1} / ${pages.length}`;
+      : !flipMode && isSpread && visible.length === 2
+        ? `hal. ${start + 1}–${start + 2} / ${pages.length}`
+        : `hal. ${start + 1} / ${pages.length}`;
   const duration = reducedMotion ? 0 : 0.35;
   const gutterLeft = "md:shadow-[inset_-28px_0_28px_-28px_rgba(0,0,0,0.35)]";
   const gutterRight = "md:shadow-[inset_28px_0_28px_-28px_rgba(0,0,0,0.35)]";
@@ -233,13 +249,13 @@ export default function BookReader({
           <div
             aria-hidden
             className={`absolute -top-2.5 -bottom-4 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 ${
-              start === 0 ? "left-1/2 -right-3" : "-inset-x-3"
+              !isPortrait && start === 0 ? "left-1/2 -right-3" : "-inset-x-3"
             }`}
           />
           <div
             aria-hidden
             className={`absolute -bottom-2.5 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] ${
-              start === 0 ? "left-[51%] right-0" : "inset-x-0"
+              !isPortrait && start === 0 ? "left-[51%] right-0" : "inset-x-0"
             }`}
           />
           <FlipBook
@@ -248,7 +264,9 @@ export default function BookReader({
             meta={meta}
             theme={theme}
             startPage={flipInitial}
+            withFiller={isSpread}
             onFlip={setStart}
+            onOrientation={setOrientation}
           />
         </div>
       ) : (
