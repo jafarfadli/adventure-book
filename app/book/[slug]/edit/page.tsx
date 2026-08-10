@@ -21,7 +21,25 @@ export default async function EditPage({ params }: Props) {
       theme: true,
       pages: {
         orderBy: { order: "asc" },
-        select: { id: true, order: true, layout: true },
+        select: {
+          id: true,
+          order: true,
+          layout: true,
+          bgStyle: true,
+          slots: {
+            select: {
+              key: true,
+              type: true,
+              imageUrl: true,
+              thumbUrl: true,
+              caption: true,
+              text: true,
+              rotation: true,
+              tapeStyle: true,
+              dateLabel: true,
+            },
+          },
+        },
       },
     },
   });

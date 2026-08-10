@@ -1,0 +1,86 @@
+"use client";
+
+import { useState } from "react";
+
+type Media = { imageUrl: string | null; thumbUrl: string | null };
+
+export function ImageUploader({
+  value,
+  onChange,
+}: {
+  value: Media;
+  onChange: (v: Media) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = (await res.json().catch(() => null)) as
+        | { imageUrl?: string; thumbUrl?: string; error?: string }
+        | null;
+      if (res.ok && data?.imageUrl && data?.thumbUrl) {
+        onChange({ imageUrl: data.imageUrl, thumbUrl: data.thumbUrl });
+      } else {
+        setError(data?.error ?? "Upload gagal. Coba lagi, ya.");
+      }
+    } catch {
+      setError("Upload gagal. Coba lagi, ya.");
+    } finally {
+      setBusy(false);
+      input.value = "";
+    }
+  }
+
+  return (
+    <div className="flex items-start gap-3">
+      {value.thumbUrl ? (
+        // Dynamic media route, intentionally a plain <img>.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={value.thumbUrl}
+          alt="Pratinjau foto"
+          className="h-20 w-20 rounded border border-stone-200 bg-stone-100 object-cover"
+        />
+      ) : (
+        <div className="flex h-20 w-20 items-center justify-center rounded border-2 border-dashed border-stone-300 text-xs text-stone-400">
+          kosong
+        </div>
+      )}
+      <div className="flex flex-col gap-2 text-sm">
+        <label className="cursor-pointer rounded-md border border-stone-300 px-3 py-1.5 text-stone-700 transition hover:bg-white">
+          {busy ? "Mengunggah…" : value.imageUrl ? "Ganti foto" : "Pilih foto"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic"
+            onChange={onFile}
+            disabled={busy}
+            className="sr-only"
+          />
+        </label>
+        {value.imageUrl && (
+          <button
+            type="button"
+            onClick={() => onChange({ imageUrl: null, thumbUrl: null })}
+            className="text-left text-rose-700 hover:underline"
+          >
+            Hapus foto
+          </button>
+        )}
+        {error && (
+          <p role="alert" className="text-rose-700">
+            {error}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}

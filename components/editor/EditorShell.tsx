@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { PageData } from "@/lib/types";
 import { AddPageForm } from "./AddPageForm";
 import { MetaEditor } from "./MetaEditor";
-import { PageList, type EditorPage } from "./PageList";
+import { PageList } from "./PageList";
 
 export function EditorShell({
   book,
@@ -16,7 +17,7 @@ export function EditorShell({
     title: string;
     subtitle: string | null;
     theme: string;
-    pages: EditorPage[];
+    pages: PageData[];
   };
 }) {
   const router = useRouter();
@@ -64,7 +65,12 @@ export function EditorShell({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
             Halaman ({book.pages.length})
           </h2>
-          <PageList bookId={book.id} pages={book.pages} />
+          <PageList
+            bookId={book.id}
+            pages={book.pages}
+            bookMeta={{ title: book.title, subtitle: book.subtitle }}
+            themeKey={book.theme}
+          />
           <AddPageForm bookId={book.id} />
         </section>
       </div>

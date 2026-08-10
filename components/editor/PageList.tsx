@@ -3,19 +3,24 @@
 import { Reorder } from "framer-motion";
 import { useEffect, useState, useTransition } from "react";
 import { deletePage, reorderPages } from "@/actions/pages";
+import type { BookMeta } from "@/components/reader/layouts";
 import { LAYOUTS } from "@/lib/layouts";
-import type { Layout } from "@prisma/client";
-
-export type EditorPage = { id: string; order: number; layout: Layout };
+import type { PageData } from "@/lib/types";
+import { PageEditor } from "./PageEditor";
 
 export function PageList({
   bookId,
   pages,
+  bookMeta,
+  themeKey,
 }: {
   bookId: string;
-  pages: EditorPage[];
+  pages: PageData[];
+  bookMeta: BookMeta;
+  themeKey: string;
 }) {
   const [items, setItems] = useState(pages);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -37,7 +42,7 @@ export function PageList({
     });
   }
 
-  function onDelete(page: EditorPage) {
+  function onDelete(page: PageData) {
     const label = LAYOUTS[page.layout].label;
     if (!confirm(`Hapus halaman "${label}"? Isi halaman ikut terhapus.`)) return;
     setError(null);
@@ -66,37 +71,53 @@ export function PageList({
         onReorder={setItems}
         className="flex flex-col gap-2"
       >
-        {items.map((page, i) => (
-          <Reorder.Item
-            key={page.id}
-            value={page}
-            onDragEnd={commitOrder}
-            className="flex items-center gap-3 rounded-lg bg-white/70 px-4 py-3 shadow-sm"
-          >
-            <span
-              aria-hidden
-              title="Seret untuk mengubah urutan"
-              className="cursor-grab select-none text-lg text-stone-400 active:cursor-grabbing"
+        {items.map((page, i) => {
+          const expanded = expandedId === page.id;
+          return (
+            <Reorder.Item
+              key={page.id}
+              value={page}
+              onDragEnd={commitOrder}
+              className="rounded-lg bg-white/70 shadow-sm"
             >
-              ⠿
-            </span>
-            <span className="w-8 text-sm tabular-nums text-stone-400">
-              {i + 1}.
-            </span>
-            <span className="flex-1 text-sm text-stone-700">
-              {LAYOUTS[page.layout].label}
-            </span>
-            <button
-              type="button"
-              onClick={() => onDelete(page)}
-              disabled={pending}
-              className="rounded-md px-2 py-1 text-sm text-rose-700 transition hover:bg-rose-50 disabled:opacity-50 focus-visible:outline-2"
-              aria-label={`Hapus halaman ${i + 1}`}
-            >
-              Hapus
-            </button>
-          </Reorder.Item>
-        ))}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <span
+                  aria-hidden
+                  title="Seret untuk mengubah urutan"
+                  className="cursor-grab select-none text-lg text-stone-400 active:cursor-grabbing"
+                >
+                  ⠿
+                </span>
+                <span className="w-8 text-sm tabular-nums text-stone-400">
+                  {i + 1}.
+                </span>
+                <span className="flex-1 text-sm text-stone-700">
+                  {LAYOUTS[page.layout].label}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(expanded ? null : page.id)}
+                  className="rounded-md px-2 py-1 text-sm text-stone-700 transition hover:bg-stone-100 focus-visible:outline-2"
+                  aria-expanded={expanded}
+                >
+                  {expanded ? "Tutup" : "Edit isi"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(page)}
+                  disabled={pending}
+                  className="rounded-md px-2 py-1 text-sm text-rose-700 transition hover:bg-rose-50 disabled:opacity-50 focus-visible:outline-2"
+                  aria-label={`Hapus halaman ${i + 1}`}
+                >
+                  Hapus
+                </button>
+              </div>
+              {expanded && (
+                <PageEditor page={page} bookMeta={bookMeta} themeKey={themeKey} />
+              )}
+            </Reorder.Item>
+          );
+        })}
       </Reorder.Group>
       {error && (
         <p role="alert" className="text-sm text-rose-700">
