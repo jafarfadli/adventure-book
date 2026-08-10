@@ -374,13 +374,15 @@ export default function BookReader({
                 <section
                   key={page.id}
                   aria-label={`Halaman ${page.order + 1}`}
-                  className={`@container relative min-h-[70dvh] p-6 md:p-10 ${
+                  className={`@container relative min-h-[70dvh] ${
                     page.layout === "COVER"
                       ? "bg-[#ff97d0]"
                       : `paper-texture ${theme.paper}`
                   } ${isSpread ? (i === 0 ? gutterLeft : gutterRight) : ""}`}
                 >
-                  {renderLayout(page, meta, theme)}
+                  <div className="h-full w-full p-5 @md:p-8">
+                    {renderLayout(page, meta, theme)}
+                  </div>
                 </section>
               ))}
               {isSpread && visible.length === 1 && (

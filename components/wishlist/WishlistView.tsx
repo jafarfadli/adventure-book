@@ -107,6 +107,9 @@ function WishlistInner({
 }) {
   const [list, setList] = useState(items);
   const [text, setText] = useState("");
+  // The add field stays out of the way until asked for, so the list reads
+  // as a clean checklist.
+  const [adding, setAdding] = useState(false);
   const [, startTransition] = useTransition();
   const toast = useToast();
 
@@ -157,6 +160,11 @@ function WishlistInner({
     });
   }
 
+  function closeAdd() {
+    setAdding(false);
+    setText("");
+  }
+
   const remaining = list.filter((i) => !i.done).length;
 
   return (
@@ -195,23 +203,52 @@ function WishlistInner({
         )}
 
         {canEdit ? (
-          <form onSubmit={onAdd} className="mt-8 flex items-center gap-2 border-t border-stone-400/25 pt-5">
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              maxLength={200}
-              placeholder="mau ke mana lagi kita?"
-              aria-label="Tulis wishlist baru"
-              className="min-w-0 flex-1 rounded-md border border-stone-300 bg-white/70 px-3 py-2 font-hand text-xl text-stone-800 placeholder:text-stone-400 focus-visible:outline-2 focus-visible:outline-offset-1"
-            />
-            <button
-              type="submit"
-              disabled={text.trim().length === 0}
-              className="rounded-md bg-stone-800 px-4 py-2 text-sm text-white transition hover:bg-stone-700 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2"
-            >
-              Tambah
-            </button>
-          </form>
+          <div className="mt-8 border-t border-stone-400/25 pt-5">
+            {adding ? (
+              <form onSubmit={onAdd} className="flex items-center gap-2">
+                <input
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && closeAdd()}
+                  autoFocus
+                  maxLength={200}
+                  placeholder="mau ke mana lagi kita?"
+                  aria-label="Tulis wishlist baru"
+                  className="min-w-0 flex-1 rounded-md border border-stone-300 bg-white/70 px-3 py-2 font-hand text-xl text-stone-800 placeholder:text-stone-400 focus-visible:outline-2 focus-visible:outline-offset-1"
+                />
+                <button
+                  type="submit"
+                  disabled={text.trim().length === 0}
+                  className="rounded-md bg-stone-800 px-4 py-2 text-sm text-white transition hover:bg-stone-700 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2"
+                >
+                  Tambah
+                </button>
+                <button
+                  type="button"
+                  onClick={closeAdd}
+                  aria-label="Batal menambah wishlist"
+                  className="rounded-md px-2 py-2 font-hand text-lg text-stone-500 transition hover:text-stone-800 focus-visible:outline-2"
+                >
+                  batal
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className={`inline-flex items-center gap-2 font-hand text-xl transition hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 ${theme.inkSoft} opacity-80`}
+              >
+                <span
+                  aria-hidden
+                  className="flex h-7 w-7 items-center justify-center rounded-[7px] border-2 border-dashed border-stone-500/50 text-lg leading-none"
+                  style={{ transform: "rotate(-2deg)" }}
+                >
+                  +
+                </span>
+                tambah wishlist
+              </button>
+            )}
+          </div>
         ) : (
           <p className={`mt-8 border-t border-stone-400/25 pt-5 font-hand text-lg ${theme.inkSoft}`}>
             Cuma bisa dilihat — buka mode edit buat nambah atau centang.

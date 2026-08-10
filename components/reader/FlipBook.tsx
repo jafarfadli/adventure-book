@@ -34,10 +34,12 @@ const FlipPage = forwardRef<
     page.layout === "COVER" ? "bg-[#ff97d0]" : `paper-texture ${theme.paper}`;
   return (
     <div ref={ref} className={`h-full w-full ${surface}`}>
-      <div
-        className={`@container h-full w-full overflow-hidden p-5 md:p-8 ${gutterClass(index)}`}
-      >
-        {renderLayout(page, meta, theme)}
+      {/* Padding is a container query, not a viewport one, so the editor
+          preview reproduces this page exactly at the same width. */}
+      <div className={`@container h-full w-full overflow-hidden ${gutterClass(index)}`}>
+        <div className="h-full w-full p-5 @md:p-8">
+          {renderLayout(page, meta, theme)}
+        </div>
       </div>
     </div>
   );

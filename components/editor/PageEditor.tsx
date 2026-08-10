@@ -1,7 +1,7 @@
 "use client";
 
 import { Layout } from "@prisma/client";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { setPageLayout, upsertSlot } from "@/actions/slots";
 import { renderLayout, type BookMeta } from "@/components/reader/layouts";
 import { useToast } from "@/components/ui/Toaster";
@@ -13,6 +13,11 @@ import { SlotEditor } from "./SlotEditor";
 const inputCls =
   "rounded-md border border-stone-300 bg-white px-3 py-2 text-base text-stone-800 " +
   "focus-visible:outline-2 focus-visible:outline-offset-1";
+
+// The reader's declared page size (see FlipBook). The preview draws a page
+// at exactly this size and scales it to fit the column.
+const PAGE_W = 460;
+const PAGE_H = 620;
 
 function emptySlot(key: string, type: "PHOTO" | "TEXT"): SlotData {
   return {
@@ -58,6 +63,18 @@ export function PageEditor({
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
   const toast = useToast();
+
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(0);
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) =>
+      setPreviewScale(entry.contentRect.width / PAGE_W),
+    );
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Adopt fresh server state after saves / layout switches.
   useEffect(() => setSlots(slotsFromPage(page)), [page]);
@@ -160,14 +177,31 @@ export function PageEditor({
           <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">
             Pratinjau
           </span>
+          {/* Renders a full-size page and scales it down, rather than
+              rendering a small page: the layouts size photos in absolute
+              units, so only an exact scale keeps the composition identical
+              to what the reader shows. */}
           <div
-            className={`@container min-h-72 rounded-md p-6 shadow-inner ${
-              page.layout === "COVER"
-                ? "bg-[#ff97d0]"
-                : `paper-texture ${theme.paper}`
-            }`}
+            ref={previewRef}
+            className="relative w-full overflow-hidden rounded-md shadow-inner"
+            style={{ aspectRatio: `${PAGE_W} / ${PAGE_H}` }}
           >
-            {renderLayout(previewPage, bookMeta, theme)}
+            <div
+              className={`@container absolute top-0 left-0 origin-top-left ${
+                page.layout === "COVER"
+                  ? "bg-[#ff97d0]"
+                  : `paper-texture ${theme.paper}`
+              }`}
+              style={{
+                width: PAGE_W,
+                height: PAGE_H,
+                transform: `scale(${previewScale})`,
+              }}
+            >
+              <div className="h-full w-full p-5 @md:p-8">
+                {renderLayout(previewPage, bookMeta, theme)}
+              </div>
+            </div>
           </div>
         </div>
       </div>

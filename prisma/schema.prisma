@@ -81,6 +81,7 @@ enum Layout {
   TRIO // 3-photo collage
   PHOTO_TEXT // 1 photo + a longer note beside it
   DUO_TEXT // 2 photos + a story
+  TRIO_TEXT // 3 photos + a story
   TEXT // full-page note / letter
   QUOTE // centered milestone quote
   CLOSING // "to be continued" style ending

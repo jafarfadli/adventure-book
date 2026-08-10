@@ -148,6 +148,29 @@ function LayoutDuoText({ slots, theme }: LayoutProps) {
   );
 }
 
+function LayoutTrioText({ slots, theme }: LayoutProps) {
+  return (
+    <div className="flex h-full flex-col justify-center">
+      {/* Three photos plus a story is the tightest layout — keep the frames
+          small and heavily overlapped so the text still fits the page. */}
+      {slots.photo1 && (
+        <PolaroidFrame slot={slots.photo1} className="ml-[3%] max-w-28 self-start" />
+      )}
+      {slots.photo2 && (
+        <PolaroidFrame slot={slots.photo2} className="-mt-10 mr-[3%] max-w-28 self-end" />
+      )}
+      {slots.photo3 && (
+        <PolaroidFrame slot={slots.photo3} className="-mt-10 max-w-28 self-center" />
+      )}
+      <TextBlock
+        slot={slots.text1}
+        theme={theme}
+        className="mt-3 line-clamp-3 max-w-[92%] self-center text-base"
+      />
+    </div>
+  );
+}
+
 function LayoutText({ slots, theme }: LayoutProps) {
   return (
     <div className="flex h-full items-center justify-center">
@@ -190,6 +213,7 @@ const RENDERERS: Record<PageData["layout"], (props: LayoutProps) => React.ReactN
   TRIO: LayoutTrio,
   PHOTO_TEXT: LayoutPhotoText,
   DUO_TEXT: LayoutDuoText,
+  TRIO_TEXT: LayoutTrioText,
   TEXT: LayoutText,
   QUOTE: LayoutQuote,
   CLOSING: LayoutClosing,
