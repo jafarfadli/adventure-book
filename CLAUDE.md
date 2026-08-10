@@ -109,6 +109,7 @@ enum Layout {
   DUO          // 2 photos side by side + captions
   TRIO         // 3-photo collage
   PHOTO_TEXT   // 1 photo + a longer note beside it
+  DUO_TEXT     // 2 photos + a story
   TEXT         // full-page note / letter
   QUOTE        // centered milestone quote
   CLOSING      // "to be continued" style ending
@@ -132,6 +133,7 @@ export const LAYOUTS: Record<Layout, { label: string; slots: SlotSpec[] }> = {
   DUO:        { label: "Dua foto",      slots: [{ key: "photo1", type: "PHOTO", label: "Foto kiri" }, { key: "photo2", type: "PHOTO", label: "Foto kanan" }] },
   TRIO:       { label: "Kolase tiga",   slots: [{ key: "photo1", type: "PHOTO", label: "Foto 1" }, { key: "photo2", type: "PHOTO", label: "Foto 2" }, { key: "photo3", type: "PHOTO", label: "Foto 3" }] },
   PHOTO_TEXT: { label: "Foto + cerita", slots: [{ key: "photo1", type: "PHOTO", label: "Foto" }, { key: "text1", type: "TEXT", label: "Cerita" }] },
+  DUO_TEXT:   { label: "Dua foto + cerita", slots: [{ key: "photo1", type: "PHOTO", label: "Foto kiri" }, { key: "photo2", type: "PHOTO", label: "Foto kanan" }, { key: "text1", type: "TEXT", label: "Cerita" }] },
   TEXT:       { label: "Surat",         slots: [{ key: "text1", type: "TEXT", label: "Isi surat" }] },
   QUOTE:      { label: "Kutipan",       slots: [{ key: "text1", type: "TEXT", label: "Kutipan" }] },
   CLOSING:    { label: "Penutup",       slots: [{ key: "text1", type: "TEXT", label: "Kata penutup" }] },
@@ -243,7 +245,7 @@ Tile URL: https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg
 - Respect `prefers-reduced-motion`: skip `flyTo` animations, jump directly.
 - Add a small "🗺️ Peta" entry point from the reader chrome.
 
-**Keys/attribution:** tiles load client-side. Stadia works without a key on localhost and many deployments, but for the public Funnel host, register a free Stadia account and use a **domain-restricted** API key — safe to expose as `NEXT_PUBLIC_STADIA_API_KEY` since it's locked to your hostname. Keep attribution controls enabled (it's a licence requirement, not optional chrome).
+**Keys/attribution:** tiles load client-side. Stadia authorizes the `localhost` referer without a key but returns **401 from any other host** — so for the public Funnel host, register a free Stadia account and use a **domain-restricted** API key — safe to expose as `NEXT_PUBLIC_STADIA_API_KEY` since it's locked to your hostname. **Fallback:** when the key is empty, `lib/mapTiles.ts` serves standard OSM tiles (`tile.openstreetmap.org`) instead so the map never breaks — plainer look, same behaviour. Keep attribution controls enabled (it's a licence requirement, not optional chrome).
 
 **Manual location (editor).** Not every photo has a geotag — screenshots, images sent over WhatsApp (strips EXIF), or shots taken with location services off arrive with no coordinates. So each PHOTO slot in the editor gets a **"📍 Lokasi"** control:
 - If the slot already has `lat`/`lng` (from EXIF or a previous manual set), show it on a small map with the pin, plus a "Ubah" and "Hapus lokasi" action.
@@ -378,10 +380,10 @@ This app is **not** served at the domain root. The Mac mini runs several apps be
 - PostgreSQL via Homebrew; run `prisma migrate deploy` on release.
 - `next build` then run under **PM2**: `PORT=3002 pm2 start npm --name adventure-book -- start`, then `pm2 save`.
 - Confirm nothing else already occupies 3002 — `lsof -i :3002` should be empty before first start.
-- Expose via **Tailscale Funnel** under the `/adventure` path (background mode):
+- Expose via **Tailscale Funnel** under the `/adventure` path (background mode). Gotcha: `--set-path` **strips** the prefix before proxying, but Next expects it because of `basePath` — so the proxy target must include `/adventure` too:
   ```bash
-  tailscale funnel --bg --set-path=/adventure localhost:3002
-  tailscale funnel status        # verify the mapping
+  tailscale funnel --bg --set-path=/adventure http://127.0.0.1:3002/adventure
+  tailscale funnel status        # verify: /adventure proxy http://127.0.0.1:3002/adventure
   ```
   Public URL: `https://jafars-mac-mini.tail9e540f.ts.net/adventure`. Funnel always serves HTTPS, so keep the session cookie `Secure`.
 - `UPLOAD_DIR` lives on local disk outside the build dir; include it in your backup routine (photos are irreplaceable).
