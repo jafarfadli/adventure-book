@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Book {
+  id               String   @id @default(cuid())
+  slug             String   @unique            // public URL segment, e.g. "our-story"
+  title            String
+  subtitle         String?
+  theme            String   @default("cream")  // theme preset key
+  coverImageUrl    String?
+  editPasswordHash String                      // bcrypt hash; plaintext known only to editors
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  pages            Page[]
+}
+
+model Page {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  order     Int // 0-based position within the book
+  layout    Layout   @default(SINGLE)
+  bgStyle   String? // optional per-page paper override
+  slots     Slot[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([bookId, order])
+  @@index([bookId])
+}
+
+model Slot {
+  id        String   @id @default(cuid())
+  pageId    String
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  key       String // slot id within the layout, e.g. "photo1", "text1"
+  type      SlotType
+  imageUrl  String? // PHOTO: processed image path
+  thumbUrl  String? // PHOTO: small thumbnail path
+  caption   String? // PHOTO: hand-written caption under the photo
+  text      String? // TEXT: the note/letter/quote body
+  rotation  Float    @default(0) // decorative tilt in degrees (approx -6..6)
+  tapeStyle String? // decorative tape/sticker preset key, nullable
+  dateLabel String? // optional hand-written date stamp
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([pageId, key])
+  @@index([pageId])
+}
+
+enum Layout {
+  COVER // title + subtitle + optional hero photo
+  SINGLE // 1 photo + caption
+  DUO // 2 photos side by side + captions
+  TRIO // 3-photo collage
+  PHOTO_TEXT // 1 photo + a longer note beside it
+  TEXT // full-page note / letter
+  QUOTE // centered milestone quote
+  CLOSING // "to be continued" style ending
+}
+
+enum SlotType {
+  PHOTO
+  TEXT
+}
