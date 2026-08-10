@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { BookData } from "@/lib/types";
 import { getTheme } from "@/lib/themes";
+import { CuteBackdrop } from "./CuteBackdrop";
 import { FlipBook, type FlipBookHandle } from "./FlipBook";
 import { renderLayout } from "./layouts";
 import { PageNav } from "./PageNav";
@@ -108,8 +109,9 @@ export default function BookReader({
   if (pages.length === 0) {
     return (
       <main
-        className={`flex min-h-dvh flex-1 items-center justify-center ${theme.backdrop}`}
+        className={`relative flex min-h-dvh flex-1 items-center justify-center ${theme.backdrop}`}
       >
+        <CuteBackdrop />
         <p className={`font-hand text-3xl ${theme.ink}`}>Belum ada halaman di buku ini.</p>
       </main>
     );
@@ -130,7 +132,7 @@ export default function BookReader({
 
   return (
     <main
-      className={`flex min-h-dvh flex-1 flex-col items-center justify-center gap-6 p-4 md:p-8 ${theme.backdrop}`}
+      className={`relative flex min-h-dvh flex-1 flex-col items-center justify-center gap-6 overflow-hidden p-4 md:p-8 ${theme.backdrop}`}
       onTouchStart={(e) => {
         if (flipMode) return;
         touchX.current = e.touches[0].clientX;
@@ -144,6 +146,18 @@ export default function BookReader({
         else prev();
       }}
     >
+      <CuteBackdrop />
+
+      <div className="fixed top-4 left-4 z-30 hidden -rotate-2 md:block">
+        <span className="relative rounded-sm bg-white/75 px-4 py-1 font-hand text-2xl text-stone-700 shadow-sm">
+          <span
+            aria-hidden
+            className="absolute -top-2.5 left-1/2 h-4 w-16 -translate-x-1/2 -rotate-3 bg-amber-200/80"
+          />
+          {book.title} ♡
+        </span>
+      </div>
+
       <div className="fixed top-4 right-4 z-30 flex items-center gap-4">
         <Link
           href={`/book/${book.slug}/map`}
@@ -171,7 +185,30 @@ export default function BookReader({
       </div>
 
       {flipMode ? (
-        <div className="w-full max-w-4xl">
+        <div className="relative w-full max-w-4xl">
+          {/* page stack peeking under the book — makes it read as a real book.
+              On the cover (and closing) page the book occupies one half only,
+              so the stack follows it. */}
+          <div
+            aria-hidden
+            className={`absolute -bottom-2.5 h-8 rounded-b-xl bg-white/85 shadow-lg ${
+              start === 0
+                ? "left-1/2 right-6 ml-6"
+                : start >= pages.length - 1
+                  ? "left-6 right-1/2 mr-6"
+                  : "inset-x-10"
+            }`}
+          />
+          <div
+            aria-hidden
+            className={`absolute -bottom-5 h-8 rounded-b-xl bg-white/60 shadow-md ${
+              start === 0
+                ? "left-1/2 right-10 ml-10"
+                : start >= pages.length - 1
+                  ? "left-10 right-1/2 mr-10"
+                  : "inset-x-16"
+            }`}
+          />
           <FlipBook
             ref={flipRef}
             pages={pages}
@@ -189,9 +226,18 @@ export default function BookReader({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -40 * dir }}
             transition={{ duration, ease: "easeOut" }}
-            className="w-full max-w-5xl"
+            className="relative w-full max-w-5xl"
           >
-            <div className="grid overflow-hidden rounded-sm shadow-2xl shadow-black/30 md:grid-cols-2">
+            {/* stacked-paper layers behind the page, scrapbook style */}
+            <div
+              aria-hidden
+              className="absolute -inset-1 -rotate-1 rounded-sm bg-white/70 shadow-xl"
+            />
+            <div
+              aria-hidden
+              className="absolute -inset-1 rotate-1 rounded-sm bg-white/50 shadow-lg"
+            />
+            <div className="relative grid overflow-hidden rounded-sm shadow-2xl shadow-black/30 md:grid-cols-2">
               {visible.map((page, i) => (
                 <section
                   key={page.id}
