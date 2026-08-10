@@ -315,7 +315,7 @@ export default function BookReader({
                   cover leaves an even pink border inside it. */}
               <div
                 aria-hidden
-                className={`pointer-events-none absolute inset-x-0 inset-y-[3px] rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 transition-opacity duration-500 ${
+                className={`pointer-events-none absolute inset-x-0 -top-px bottom-0 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 transition-opacity duration-500 ${
                   isCoverView ? "opacity-100" : "opacity-0"
                 }`}
               />
@@ -323,28 +323,27 @@ export default function BookReader({
                   pink is the cover surface *behind* the paper, so it only
                   shows on the bound side — the other side is the spread
                   running on past the viewport. */}
-              <div className="relative -mx-4 overflow-hidden py-3.5">
+              <div className="relative -mx-4 overflow-hidden pt-2.5 pb-5">
                 <div
                   aria-hidden
                   className={`absolute inset-0 bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 transition-opacity duration-500 ${
                     isCoverView ? "opacity-0" : "opacity-100"
                   }`}
                 />
-                {/* Edge of the page block under the open page — it tracks
-                    the paper, so it runs off-screen on the side the spread
-                    continues, exactly like the desktop book. */}
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute bottom-[2px] h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] transition-all duration-[650ms] ease-in-out"
-                  style={{
-                    left: isCoverView ? CAM_SPAN / 2 : half === 0 ? CAM_RIM : 0,
-                    right: isCoverView ? CAM_SPAN / 2 : half === 0 ? 0 : CAM_RIM,
-                  }}
-                />
                 <div
                   className="relative w-[calc(200vw-108px)] transition-transform duration-[650ms] ease-in-out"
                   style={{ transform: camTransform }}
                 >
+                  {/* Edge of the page block. It belongs to the book, so it
+                      lives inside the panned element and shares its exact
+                      transform — anchoring it to the viewport instead made
+                      it drift against the pages while swiping. Spans the
+                      whole spread; under the shut cover, only its half. */}
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute -bottom-3 right-0 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] transition-[left] duration-[650ms] ease-in-out"
+                    style={{ left: isCoverView ? "calc(100vw - 54px)" : 0 }}
+                  />
                   <FlipBook
                     key="camera"
                     ref={flipRef}
