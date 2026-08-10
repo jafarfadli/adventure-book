@@ -3,6 +3,9 @@
 export function CuteBackdrop() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      {/* notebook dot grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(rgba(120,90,60,0.22)_1px,transparent_1px)] [background-size:22px_22px]" />
+
       {/* watercolor blobs */}
       <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-rose-300/45 blur-3xl" />
       <div className="absolute top-1/4 -right-24 h-96 w-96 rounded-full bg-sky-300/40 blur-3xl" />
@@ -37,6 +40,18 @@ export function CuteBackdrop() {
       <span className="absolute left-[4%] top-[55%] hidden -rotate-12 font-hand text-2xl text-amber-500/50 md:block">
         ✿
       </span>
+      <span className="absolute right-[5%] top-[62%] hidden rotate-6 font-hand text-xl text-purple-400/60 md:block">
+        xoxo
+      </span>
+      <span className="absolute left-[30%] top-[7%] hidden -rotate-6 font-hand text-xl text-emerald-500/50 md:block">
+        ♪
+      </span>
+      <span className="absolute right-[30%] bottom-[6%] rotate-3 font-hand text-xl text-rose-400/60">
+        ˚ ༘ ♡
+      </span>
+
+      {/* dashed hand-drawn frame around the screen */}
+      <div className="absolute inset-3 rounded-2xl border-2 border-dashed border-stone-500/15 md:inset-5" />
     </div>
   );
 }

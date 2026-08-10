@@ -3,9 +3,11 @@ import type { SlotData } from "@/lib/types";
 
 export function PolaroidFrame({
   slot,
-  className = "",
+  className = "max-w-72",
 }: {
   slot: SlotData;
+  /** Must set the frame's max width (e.g. "max-w-44") — no baked-in default,
+   *  so callers' size classes never fight a base max-w utility. */
   className?: string;
 }) {
   const alt = slot.caption || "foto kenangan";
@@ -15,7 +17,7 @@ export function PolaroidFrame({
 
   return (
     <figure
-      className={`relative w-full max-w-72 bg-white p-3 pb-2 shadow-xl shadow-black/20 ${className}`}
+      className={`relative w-full bg-white p-3 pb-2 shadow-xl shadow-black/20 ${className}`}
       style={{ transform: `rotate(${slot.rotation}deg)` }}
     >
       {tape && (

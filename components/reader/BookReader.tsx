@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { IconList, IconMapPin, IconPencil, IconShare } from "@/components/ui/icons";
 import type { BookData } from "@/lib/types";
 import { getTheme } from "@/lib/themes";
 import { CuteBackdrop } from "./CuteBackdrop";
@@ -36,6 +37,11 @@ export default function BookReader({
   // 3D page-flip on md+; fall back to fade-slide when motion is reduced.
   const flipMode = isSpread && !reducedMotion;
   const perView = isSpread ? 2 : 1;
+
+  // With showCover, valid flip views start at 0, odd indices, and the last
+  // page — normalize deep-link targets so StPageFlip lands on a real spread.
+  const flipInitial =
+    initialPage === 0 ? 0 : initialPage % 2 === 1 ? initialPage : initialPage - 1;
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
@@ -82,7 +88,7 @@ export default function BookReader({
     (i: number) => {
       setTocOpen(false);
       if (flipMode) {
-        flipRef.current?.pageFlip().turnToPage(i);
+        flipRef.current?.pageFlip().turnToPage(i === 0 ? 0 : i % 2 === 1 ? i : i - 1);
         return;
       }
       setDir(i >= start ? 1 : -1);
@@ -117,6 +123,11 @@ export default function BookReader({
     );
   }
 
+  // Back-cover single view only exists for even-length books. StPageFlip
+  // reports len-1 when flipped there but len-2 when initialized there, so
+  // accept both — len-2 never occurs as a real spread index (spreads start
+  // at odd indices).
+  const isBackView = pages.length % 2 === 0 && start >= pages.length - 2;
   const canPrev = start > 0;
   const canNext = flipMode
     ? start < pages.length - 1
@@ -132,7 +143,7 @@ export default function BookReader({
 
   return (
     <main
-      className={`relative flex min-h-dvh flex-1 flex-col items-center justify-center gap-6 overflow-hidden p-4 md:p-8 ${theme.backdrop}`}
+      className={`relative flex min-h-dvh flex-1 flex-col items-center justify-center gap-6 overflow-hidden px-4 pt-16 pb-4 md:px-8 md:pt-20 md:pb-8 ${theme.backdrop}`}
       onTouchStart={(e) => {
         if (flipMode) return;
         touchX.current = e.touches[0].clientX;
@@ -161,52 +172,44 @@ export default function BookReader({
       <div className="fixed top-4 right-4 z-30 flex items-center gap-4">
         <Link
           href={`/book/${book.slug}/map`}
-          className={`font-hand text-lg opacity-50 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
+          className={`inline-flex items-center gap-1.5 font-hand text-lg opacity-50 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
           aria-label="Buka peta kenangan"
         >
-          🗺️ peta
+          <IconMapPin className="h-4 w-4" /> peta
         </Link>
         <button
           type="button"
           onClick={() => setTocOpen(true)}
           aria-label="Buka daftar isi"
-          className={`font-hand text-lg opacity-50 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
+          className={`inline-flex items-center gap-1.5 font-hand text-lg opacity-50 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
         >
-          ☰ daftar isi
+          <IconList className="h-4 w-4" /> daftar isi
         </button>
         <button
           type="button"
           onClick={share}
           aria-label="Bagikan buku ini"
-          className={`font-hand text-lg opacity-50 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
+          className={`inline-flex items-center gap-1.5 font-hand text-lg opacity-50 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
         >
-          {copied ? "Tersalin ✓" : "↗ bagikan"}
+          <IconShare className="h-4 w-4" /> {copied ? "tersalin ✓" : "bagikan"}
         </button>
       </div>
 
       {flipMode ? (
         <div className="relative w-full max-w-4xl">
-          {/* page stack peeking under the book — makes it read as a real book.
-              On the cover (and closing) page the book occupies one half only,
-              so the stack follows it. */}
+          {/* Book cover peeking out around the pages + the paper block edge
+              at the bottom. On the cover/closing views the book occupies one
+              half only, so the chrome follows the open half. */}
           <div
             aria-hidden
-            className={`absolute -bottom-2.5 h-8 rounded-b-xl bg-white/85 shadow-lg ${
-              start === 0
-                ? "left-1/2 right-6 ml-6"
-                : start >= pages.length - 1
-                  ? "left-6 right-1/2 mr-6"
-                  : "inset-x-10"
+            className={`absolute -top-2.5 -bottom-4 rounded-md bg-gradient-to-br from-rose-400 via-rose-500 to-rose-700 shadow-2xl shadow-black/40 ${
+              start === 0 ? "left-1/2 -right-3" : isBackView ? "-left-3 right-1/2" : "-inset-x-3"
             }`}
           />
           <div
             aria-hidden
-            className={`absolute -bottom-5 h-8 rounded-b-xl bg-white/60 shadow-md ${
-              start === 0
-                ? "left-1/2 right-10 ml-10"
-                : start >= pages.length - 1
-                  ? "left-10 right-1/2 mr-10"
-                  : "inset-x-16"
+            className={`absolute -bottom-2.5 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] ${
+              start === 0 ? "left-[51%] right-0" : isBackView ? "left-0 right-[51%]" : "inset-x-0"
             }`}
           />
           <FlipBook
@@ -214,7 +217,7 @@ export default function BookReader({
             pages={pages}
             meta={meta}
             theme={theme}
-            startPage={initialPage}
+            startPage={flipInitial}
             onFlip={setStart}
           />
         </div>
@@ -228,21 +231,21 @@ export default function BookReader({
             transition={{ duration, ease: "easeOut" }}
             className="relative w-full max-w-5xl"
           >
-            {/* stacked-paper layers behind the page, scrapbook style */}
+            {/* notebook cover peeking around the page + paper block edge */}
             <div
               aria-hidden
-              className="absolute -inset-1 -rotate-1 rounded-sm bg-white/70 shadow-xl"
+              className="absolute -inset-x-2 -top-2 -bottom-3.5 rounded-md bg-gradient-to-br from-rose-400 via-rose-500 to-rose-700 shadow-2xl shadow-black/40"
             />
             <div
               aria-hidden
-              className="absolute -inset-1 rotate-1 rounded-sm bg-white/50 shadow-lg"
+              className="absolute inset-x-0 -bottom-2 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)]"
             />
             <div className="relative grid overflow-hidden rounded-sm shadow-2xl shadow-black/30 md:grid-cols-2">
               {visible.map((page, i) => (
                 <section
                   key={page.id}
                   aria-label={`Halaman ${page.order + 1}`}
-                  className={`@container relative min-h-[70dvh] p-6 md:p-10 ${theme.paper} ${
+                  className={`@container paper-texture relative min-h-[70dvh] p-6 md:p-10 ${theme.paper} ${
                     isSpread ? (i === 0 ? gutterLeft : gutterRight) : ""
                   }`}
                 >
@@ -267,10 +270,10 @@ export default function BookReader({
       />
       <Link
         href={`/book/${book.slug}/unlock`}
-        className={`fixed right-4 bottom-4 font-hand text-lg opacity-40 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
+        className={`fixed right-4 bottom-4 inline-flex items-center gap-1.5 font-hand text-lg opacity-40 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
         aria-label="Buka mode edit"
       >
-        ✎ edit
+        <IconPencil className="h-4 w-4" /> edit
       </Link>
       {tocOpen && (
         <TocOverlay

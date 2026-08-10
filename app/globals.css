@@ -9,3 +9,8 @@
 body {
   font-family: var(--font-inter), system-ui, sans-serif;
 }
+
+/* Subtle paper grain, layered over the theme's paper color. */
+.paper-texture {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.28 0 0 0 0.045 0'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
+}

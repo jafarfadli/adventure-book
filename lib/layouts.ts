@@ -39,6 +39,14 @@ export const LAYOUTS: Record<Layout, { label: string; slots: SlotSpec[] }> = {
       { key: "text1", type: "TEXT", label: "Cerita" },
     ],
   },
+  DUO_TEXT: {
+    label: "Dua foto + cerita",
+    slots: [
+      { key: "photo1", type: "PHOTO", label: "Foto kiri" },
+      { key: "photo2", type: "PHOTO", label: "Foto kanan" },
+      { key: "text1", type: "TEXT", label: "Cerita" },
+    ],
+  },
   TEXT: {
     label: "Surat",
     slots: [{ key: "text1", type: "TEXT", label: "Isi surat" }],

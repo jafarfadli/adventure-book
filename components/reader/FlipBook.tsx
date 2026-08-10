@@ -22,7 +22,7 @@ const FlipPage = forwardRef<
 >(function FlipPage({ page, meta, theme }, ref) {
   return (
     <div ref={ref} className={`h-full w-full ${theme.paper}`}>
-      <div className="@container h-full w-full overflow-x-hidden overflow-y-auto p-6 md:p-8">
+      <div className="@container paper-texture h-full w-full overflow-hidden p-6 md:p-8">
         {renderLayout(page, meta, theme)}
       </div>
     </div>

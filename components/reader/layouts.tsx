@@ -3,7 +3,12 @@ import type { Theme } from "@/lib/themes";
 import { PolaroidFrame } from "./PolaroidFrame";
 
 // One small renderer per Layout value, selected by renderLayout(). The same
-// components will back the editor preview later — keep them presentation-only.
+// components back the editor preview — keep them presentation-only.
+//
+// Pages are FIXED size (no scrolling): multi-photo layouts shrink their
+// polaroids and stagger them left/right with slight overlaps, scrapbook
+// style, and long text is line-clamped so nothing overflows the paper.
+// Container queries (@xl) adapt to the page's own width, not the viewport.
 
 export type BookMeta = { title: string; subtitle: string | null };
 type LayoutProps = { slots: Record<string, SlotData>; book: BookMeta; theme: Theme };
@@ -12,10 +17,20 @@ function slotMap(page: PageData): Record<string, SlotData> {
   return Object.fromEntries(page.slots.map((s) => [s.key, s]));
 }
 
-function TextBlock({ slot, theme, className = "" }: { slot?: SlotData; theme: Theme; className?: string }) {
+function TextBlock({
+  slot,
+  theme,
+  className = "",
+}: {
+  slot?: SlotData;
+  theme: Theme;
+  className?: string;
+}) {
   if (!slot?.text) return null;
   return (
-    <p className={`whitespace-pre-wrap font-hand-alt text-lg leading-relaxed ${theme.ink} ${className}`}>
+    <p
+      className={`whitespace-pre-wrap font-hand-alt text-lg leading-relaxed ${theme.ink} ${className}`}
+    >
       {slot.text}
     </p>
   );
@@ -23,12 +38,12 @@ function TextBlock({ slot, theme, className = "" }: { slot?: SlotData; theme: Th
 
 function LayoutCover({ slots, book, theme }: LayoutProps) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 text-center">
+    <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
       <h1 className={`font-hand text-5xl md:text-6xl ${theme.ink}`}>{book.title}</h1>
       {book.subtitle && (
         <p className={`font-hand-alt text-xl ${theme.inkSoft}`}>{book.subtitle}</p>
       )}
-      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="max-w-60" />}
+      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="max-w-56" />}
       {slots.text1?.text && (
         <p className={`font-hand text-2xl ${theme.accent}`}>{slots.text1.text}</p>
       )}
@@ -39,41 +54,78 @@ function LayoutCover({ slots, book, theme }: LayoutProps) {
 function LayoutSingle({ slots }: LayoutProps) {
   return (
     <div className="flex h-full items-center justify-center">
-      {slots.photo1 && <PolaroidFrame slot={slots.photo1} />}
+      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="max-w-64" />}
     </div>
   );
 }
 
-// Layout switches below use container queries (@xl etc.) so a page adapts to
-// its own width — a flip-book page is ~450px wide even on a wide viewport.
 function LayoutDuo({ slots }: LayoutProps) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 @xl:flex-row @xl:gap-8">
-      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="max-w-44 @xl:max-w-56" />}
-      {slots.photo2 && <PolaroidFrame slot={slots.photo2} className="max-w-44 @xl:max-w-56" />}
+    <div className="flex h-full flex-col justify-center">
+      {slots.photo1 && (
+        <PolaroidFrame slot={slots.photo1} className="ml-[6%] max-w-44 self-start @xl:max-w-52" />
+      )}
+      {slots.photo2 && (
+        <PolaroidFrame
+          slot={slots.photo2}
+          className="-mt-10 mr-[6%] max-w-44 self-end @xl:max-w-52"
+        />
+      )}
     </div>
   );
 }
 
 function LayoutTrio({ slots }: LayoutProps) {
   return (
-    <div className="flex h-full flex-wrap items-center justify-center gap-6">
-      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="max-w-40 @xl:max-w-48" />}
-      {slots.photo2 && (
-        <PolaroidFrame slot={slots.photo2} className="max-w-40 @xl:max-w-48 @xl:translate-y-6" />
+    <div className="flex h-full flex-col justify-center">
+      {slots.photo1 && (
+        <PolaroidFrame slot={slots.photo1} className="ml-[4%] max-w-36 self-start @xl:max-w-40" />
       )}
-      {slots.photo3 && <PolaroidFrame slot={slots.photo3} className="max-w-40 @xl:max-w-48" />}
+      {slots.photo2 && (
+        <PolaroidFrame
+          slot={slots.photo2}
+          className="-mt-9 mr-[4%] max-w-36 self-end @xl:max-w-40"
+        />
+      )}
+      {slots.photo3 && (
+        <PolaroidFrame slot={slots.photo3} className="-mt-7 max-w-36 self-center @xl:max-w-40" />
+      )}
     </div>
   );
 }
 
 function LayoutPhotoText({ slots, theme }: LayoutProps) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 @xl:flex-row @xl:gap-8">
+    <div className="flex h-full flex-col justify-center gap-4">
       {slots.photo1 && (
-        <PolaroidFrame slot={slots.photo1} className="shrink-0 max-w-48 @xl:max-w-60" />
+        <PolaroidFrame slot={slots.photo1} className="ml-[5%] max-w-48 self-start @xl:max-w-56" />
       )}
-      <TextBlock slot={slots.text1} theme={theme} className="max-w-prose" />
+      <TextBlock
+        slot={slots.text1}
+        theme={theme}
+        className="mr-[5%] line-clamp-[8] max-w-[85%] self-end"
+      />
+    </div>
+  );
+}
+
+function LayoutDuoText({ slots, theme }: LayoutProps) {
+  return (
+    <div className="flex h-full flex-col justify-center">
+      {slots.photo1 && (
+        <PolaroidFrame slot={slots.photo1} className="ml-[4%] max-w-36 self-start @xl:max-w-44" />
+      )}
+      {slots.photo2 && (
+        <PolaroidFrame
+          slot={slots.photo2}
+          className="-mt-9 mr-[4%] max-w-36 self-end @xl:max-w-44"
+        />
+      )}
+      <TextBlock
+        slot={slots.text1}
+        theme={theme}
+        className="mt-4 line-clamp-5 max-w-[90%] self-center"
+      />
     </div>
   );
 }
@@ -81,7 +133,11 @@ function LayoutPhotoText({ slots, theme }: LayoutProps) {
 function LayoutText({ slots, theme }: LayoutProps) {
   return (
     <div className="flex h-full items-center justify-center">
-      <TextBlock slot={slots.text1} theme={theme} className="max-w-prose text-xl" />
+      <TextBlock
+        slot={slots.text1}
+        theme={theme}
+        className="line-clamp-[12] max-w-prose text-xl"
+      />
     </div>
   );
 }
@@ -115,6 +171,7 @@ const RENDERERS: Record<PageData["layout"], (props: LayoutProps) => React.ReactN
   DUO: LayoutDuo,
   TRIO: LayoutTrio,
   PHOTO_TEXT: LayoutPhotoText,
+  DUO_TEXT: LayoutDuoText,
   TEXT: LayoutText,
   QUOTE: LayoutQuote,
   CLOSING: LayoutClosing,

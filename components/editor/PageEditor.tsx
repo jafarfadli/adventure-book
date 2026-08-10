@@ -160,7 +160,7 @@ export function PageEditor({
           <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">
             Pratinjau
           </span>
-          <div className={`@container min-h-72 rounded-md p-6 shadow-inner ${theme.paper}`}>
+          <div className={`@container paper-texture min-h-72 rounded-md p-6 shadow-inner ${theme.paper}`}>
             {renderLayout(previewPage, bookMeta, theme)}
           </div>
         </div>
