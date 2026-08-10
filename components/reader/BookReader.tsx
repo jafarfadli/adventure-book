@@ -205,10 +205,13 @@ export default function BookReader({
   const CAM_RIM = 14;
   const CAM_PEEK = 40;
   const CAM_SPAN = CAM_RIM + CAM_PEEK;
+  // The closed cover is its own thing: a book seen shut, framed on all four
+  // sides. `half` flips the instant a turn starts, so the framing swaps
+  // under the motion instead of popping when the animation lands.
+  const isCoverView = start === 0 && half === 1;
   const camTransform =
-    start === 0
-      ? // closed cover: centre it so pink frames all four sides
-        `translateX(calc(${CAM_SPAN / 2 + CAM_SPAN}px - 100vw))`
+    isCoverView
+      ? `translateX(calc(${CAM_SPAN / 2 + CAM_SPAN}px - 100vw))`
       : half === 0
         ? // left page: pink rim at the left, facing page bleeds off the right
           `translateX(${CAM_RIM}px)`
@@ -306,27 +309,50 @@ export default function BookReader({
             </>
           )}
           {cameraMode ? (
-            // Full-bleed window onto a book wider than the screen. The pink
-            // is the cover surface *behind* the paper, so it only shows on
-            // the bound side — the other side is the spread running on past
-            // the viewport.
-            <div className="-mx-4 overflow-hidden bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] py-3.5 shadow-2xl shadow-black/40">
+            <>
+              {/* Shut-book frame, cover only. Sits outside the camera's
+                  clipping box so its drop shadow survives; the centred
+                  cover leaves an even pink border inside it. */}
               <div
-                className="w-[calc(200vw-108px)] transition-transform duration-[650ms] ease-in-out"
-                style={{ transform: camTransform }}
-              >
-                <FlipBook
-                  key="camera"
-                  ref={flipRef}
-                  pages={pages}
-                  meta={meta}
-                  theme={theme}
-                  startPage={flipInitial}
-                  useMouseEvents={false}
-                  onFlip={setStart}
+                aria-hidden
+                className={`pointer-events-none absolute inset-x-0 inset-y-[3px] rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 transition-opacity duration-500 ${
+                  isCoverView ? "opacity-100" : "opacity-0"
+                }`}
+              />
+              <div
+                aria-hidden
+                className={`pointer-events-none absolute bottom-[6px] left-[11px] right-[11px] h-2 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] transition-opacity duration-500 ${
+                  isCoverView ? "opacity-100" : "opacity-0"
+                }`}
+              />
+              {/* Full-bleed window onto a book wider than the screen. The
+                  pink is the cover surface *behind* the paper, so it only
+                  shows on the bound side — the other side is the spread
+                  running on past the viewport. */}
+              <div className="relative -mx-4 overflow-hidden py-3.5">
+                <div
+                  aria-hidden
+                  className={`absolute inset-0 bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 transition-opacity duration-500 ${
+                    isCoverView ? "opacity-0" : "opacity-100"
+                  }`}
                 />
+                <div
+                  className="relative w-[calc(200vw-108px)] transition-transform duration-[650ms] ease-in-out"
+                  style={{ transform: camTransform }}
+                >
+                  <FlipBook
+                    key="camera"
+                    ref={flipRef}
+                    pages={pages}
+                    meta={meta}
+                    theme={theme}
+                    startPage={flipInitial}
+                    useMouseEvents={false}
+                    onFlip={setStart}
+                  />
+                </div>
               </div>
-            </div>
+            </>
           ) : (
             <FlipBook
               key="full"
