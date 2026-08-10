@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { BASE_PATH } from "./basePath";
 
 const COOKIE_NAME = "ab_session";
 const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // ~30 days
@@ -24,14 +25,15 @@ export async function createEditorSession(bookId: string): Promise<void> {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    path: "/",
+    // Scoped to the subpath: other apps on the shared hostname never see it.
+    path: BASE_PATH,
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
 }
 
 export async function clearEditorSession(): Promise<void> {
   const store = await cookies();
-  store.delete(COOKIE_NAME);
+  store.set(COOKIE_NAME, "", { path: BASE_PATH, maxAge: 0 });
 }
 
 /** Returns the bookId the current session may edit, or null. */

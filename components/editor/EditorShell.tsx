@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ToastProvider } from "@/components/ui/Toaster";
+import { withBase } from "@/lib/basePath";
 import type { PageData } from "@/lib/types";
 import { AddPageForm } from "./AddPageForm";
 import { MetaEditor } from "./MetaEditor";
@@ -27,7 +28,7 @@ export function EditorShell({
 
   async function finishEditing() {
     setLeaving(true);
-    await fetch("/api/session", { method: "DELETE" }).catch(() => null);
+    await fetch(withBase("/api/session"), { method: "DELETE" }).catch(() => null);
     router.push(`/book/${book.slug}`);
     router.refresh();
   }

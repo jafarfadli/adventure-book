@@ -262,6 +262,7 @@ Layout rendering: one small component per `Layout` value (e.g. `LayoutSingle`, `
 
 ```
 PORT=3002                  # app listens here (dev + prod)
+BASE_PATH=/adventure       # served under a subpath on the shared Funnel hostname
 DATABASE_URL=postgresql://.../adventure_book
 SESSION_SECRET=            # jose HS256 signing secret (long random)
 UPLOAD_DIR=                # persistent path, e.g. /Users/<you>/adventure-book/uploads
@@ -273,10 +274,30 @@ SEED_EDIT_PASSWORD=        # plaintext used only by prisma/seed.ts to create the
 
 ## 12. Deployment (Mac mini M4)
 
-- App runs on **port 3002** (set `PORT=3002`). In `package.json`, make the scripts explicit: `"dev": "next dev -p 3002"` and `"start": "next start -p 3002"` (belt-and-suspenders alongside the `PORT` env var).
+This app is **not** served at the domain root. The Mac mini runs several apps behind a single Tailscale Funnel hostname (`jafars-mac-mini.tail9e540f.ts.net`), differentiated by path. This one lives under **`/adventure`**.
+
+- App runs on **port 3002** (set `PORT=3002`). In `package.json`, make the scripts explicit: `"dev": "next dev -p 3002"` and `"start": "next start -p 3002"`.
+- **Base path.** Set `basePath` in `next.config` so all routes and assets resolve under `/adventure`:
+  ```js
+  // next.config.js
+  const nextConfig = { basePath: process.env.BASE_PATH || "/adventure" };
+  ```
+  `next/link`, `next/image`, and the router handle `basePath` automatically. **Manual `fetch` calls do not** — any hand-written path (e.g. calling `/api/upload`, `/api/session`, or building an `imageUrl`) must be prefixed. Define one helper and use it everywhere:
+  ```ts
+  // lib/basePath.ts
+  export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "/adventure";
+  export const withBase = (p: string) => `${BASE_PATH}${p}`;
+  ```
+  Store media as `withBase("/api/media/<cuid>.webp")` so paths stay correct under the subpath.
+- **Cookie scope (important).** Because every app on the Mac mini shares the same hostname, cookies leak across apps unless scoped. Set the `ab_session` cookie with **`Path=/adventure`** so it isn't sent to (or clobbered by) Signum or any other app on the same host. Use a book-specific cookie name too (`ab_session`, not `session`).
 - PostgreSQL via Homebrew; run `prisma migrate deploy` on release.
 - `next build` then run under **PM2**: `PORT=3002 pm2 start npm --name adventure-book -- start`, then `pm2 save`.
-- Expose publicly with **Tailscale Funnel** pointed at 3002: `tailscale funnel 3002`. Because Funnel serves over HTTPS, keep the session cookie `Secure`.
-- Confirm nothing else on the Mac mini already occupies 3002 (you've got several PM2 apps) — `lsof -i :3002` should be empty before first start.
+- Confirm nothing else already occupies 3002 — `lsof -i :3002` should be empty before first start.
+- Expose via **Tailscale Funnel** under the `/adventure` path (background mode):
+  ```bash
+  tailscale funnel --bg --set-path=/adventure localhost:3002
+  tailscale funnel status        # verify the mapping
+  ```
+  Public URL: `https://jafars-mac-mini.tail9e540f.ts.net/adventure`. Funnel always serves HTTPS, so keep the session cookie `Secure`.
 - `UPLOAD_DIR` lives on local disk outside the build dir; include it in your backup routine (photos are irreplaceable).
 - Set `NODE_ENV=production`; confirm `next.config` allows serving images through the media route (they're not in `/public`).

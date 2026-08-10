@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { withBase } from "@/lib/basePath";
 
 export function UnlockForm({ slug }: { slug: string }) {
   const router = useRouter();
@@ -14,7 +15,7 @@ export function UnlockForm({ slug }: { slug: string }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/session", {
+      const res = await fetch(withBase("/api/session"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug, password }),

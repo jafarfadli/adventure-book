@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import { withBase } from "./basePath";
 
 export const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
@@ -43,8 +44,9 @@ export async function processUpload(
   await writeFile(path.join(dir, `${id}.webp`), main);
   await writeFile(path.join(dir, `${id}.thumb.webp`), thumb);
 
+  // Stored with the base path so <img src> works as-is under the subpath.
   return {
-    imageUrl: `/api/media/${id}.webp`,
-    thumbUrl: `/api/media/${id}.thumb.webp`,
+    imageUrl: withBase(`/api/media/${id}.webp`),
+    thumbUrl: withBase(`/api/media/${id}.thumb.webp`),
   };
 }

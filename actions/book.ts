@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireEditor } from "@/lib/auth";
+import { MEDIA_PATH_RE } from "@/lib/basePath";
 import { prisma } from "@/lib/db";
 import { THEMES } from "@/lib/themes";
 
@@ -14,10 +15,7 @@ const metaSchema = z.object({
     .max(200)
     .transform((s) => (s === "" ? null : s)),
   theme: z.string().refine((t) => t in THEMES, "Tema tidak dikenal"),
-  coverImageUrl: z
-    .string()
-    .regex(/^\/api\/media\/[A-Za-z0-9-]+(\.thumb)?\.webp$/, "Path media tidak valid")
-    .nullable(),
+  coverImageUrl: z.string().regex(MEDIA_PATH_RE, "Path media tidak valid").nullable(),
 });
 
 export async function updateBookMeta(

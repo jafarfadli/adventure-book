@@ -4,6 +4,7 @@ import { Layout } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireEditor } from "@/lib/auth";
+import { MEDIA_PATH_RE } from "@/lib/basePath";
 import { prisma } from "@/lib/db";
 import { LAYOUTS } from "@/lib/layouts";
 import { isTapeStyle } from "@/lib/tapes";
@@ -11,7 +12,7 @@ import { isTapeStyle } from "@/lib/tapes";
 const cuidSchema = z.string().min(1).max(64);
 const mediaPathSchema = z
   .string()
-  .regex(/^\/api\/media\/[A-Za-z0-9-]+(\.thumb)?\.webp$/, "Path media tidak valid");
+  .regex(MEDIA_PATH_RE, "Path media tidak valid");
 
 const emptyToNull = (s: string) => (s.trim() === "" ? null : s.trim());
 

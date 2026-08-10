@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ui/Toaster";
+import { withBase } from "@/lib/basePath";
 
 type Media = { imageUrl: string | null; thumbUrl: string | null };
 
@@ -23,7 +24,7 @@ export function ImageUploader({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const res = await fetch(withBase("/api/upload"), { method: "POST", body: fd });
       const data = (await res.json().catch(() => null)) as
         | { imageUrl?: string; thumbUrl?: string; error?: string }
         | null;
