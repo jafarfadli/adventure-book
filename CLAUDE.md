@@ -225,7 +225,7 @@ Tile URL: https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg
 - Respect `prefers-reduced-motion`: skip `flyTo` animations, jump directly.
 - Add a small "🗺️ Peta" entry point from the reader chrome.
 
-**Keys/attribution:** tiles load client-side. Stadia works without a key on localhost and many deployments, but for the public Funnel host, register a free Stadia account and use a **domain-restricted** API key — safe to expose as `NEXT_PUBLIC_STADIA_API_KEY` since it's locked to your hostname. Keep attribution controls enabled (it's a licence requirement, not optional chrome).
+**Keys/attribution:** tiles load client-side. Stadia authorizes the `localhost` referer without a key but returns **401 from any other host** — so for the public Funnel host, register a free Stadia account and use a **domain-restricted** API key — safe to expose as `NEXT_PUBLIC_STADIA_API_KEY` since it's locked to your hostname. **Fallback:** when the key is empty, `lib/mapTiles.ts` serves standard OSM tiles (`tile.openstreetmap.org`) instead so the map never breaks — plainer look, same behaviour. Keep attribution controls enabled (it's a licence requirement, not optional chrome).
 
 **Manual location (editor).** Not every photo has a geotag — screenshots, images sent over WhatsApp (strips EXIF), or shots taken with location services off arrive with no coordinates. So each PHOTO slot in the editor gets a **"📍 Lokasi"** control:
 - If the slot already has `lat`/`lng` (from EXIF or a previous manual set), show it on a small map with the pin, plus a "Ubah" and "Hapus lokasi" action.
