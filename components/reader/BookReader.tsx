@@ -48,13 +48,43 @@ export default function BookReader({
     const mq = window.matchMedia("(min-width: 768px)");
     const apply = () => {
       setIsSpread(mq.matches);
-      // Keep spreads aligned to even page indices (fade-slide mode).
-      if (mq.matches) setStart((s) => s - (s % 2));
+      // Align to the mode's spread grid: fade-slide pairs (0,1)(2,3)… so
+      // even starts; the flip book (showCover) pairs (1,2)(3,4)… so odd
+      // starts. Using the wrong grid corrupts deep-linked positions.
+      if (mq.matches) {
+        setStart((s) =>
+          reducedMotion ? s - (s % 2) : s === 0 ? 0 : s % 2 === 1 ? s : s - 1,
+        );
+      }
     };
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
-  }, []);
+  }, [reducedMotion]);
+
+  // Follow ?page= even when this instance is reused (e.g. a map pin pushes a
+  // new search param onto the same route). Runs after FlipBook's own init, so
+  // it also overrides react-pageflip's occasionally-off initial onFlip value.
+  const prevInitialPage = useRef(initialPage);
+  useEffect(() => {
+    const changed = prevInitialPage.current !== initialPage;
+    prevInitialPage.current = initialPage;
+    if (flipMode) {
+      setStart(flipInitial);
+      if (changed) {
+        // pageFlip() is undefined until StPageFlip finishes initializing;
+        // on first mount startPage already positions the book.
+        try {
+          flipRef.current?.pageFlip()?.turnToPage(flipInitial);
+        } catch {
+          // not ready yet — startPage/state already point at the target
+        }
+      }
+    } else {
+      setStart(isSpread ? initialPage - (initialPage % 2) : initialPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPage, flipMode]);
 
   const next = useCallback(() => {
     if (flipMode) {
