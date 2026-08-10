@@ -123,14 +123,13 @@ export default function BookReader({
     );
   }
 
-  // Back-cover single view only exists for even-length books. StPageFlip
-  // reports len-1 when flipped there but len-2 when initialized there, so
-  // accept both — len-2 never occurs as a real spread index (spreads start
-  // at odd indices).
-  const isBackView = pages.length % 2 === 0 && start >= pages.length - 2;
   const canPrev = start > 0;
+  // Flip mode: last spread starts at len-1 (even books, filler added) or
+  // len-2 (odd books).
   const canNext = flipMode
-    ? start < pages.length - 1
+    ? start === 0
+      ? pages.length > 1
+      : start + 2 < pages.length
     : start + perView < pages.length;
   const visible = pages.slice(start, start + perView);
   const label =
@@ -202,14 +201,14 @@ export default function BookReader({
               half only, so the chrome follows the open half. */}
           <div
             aria-hidden
-            className={`absolute -top-2.5 -bottom-4 rounded-md bg-gradient-to-br from-rose-400 via-rose-500 to-rose-700 shadow-2xl shadow-black/40 ${
-              start === 0 ? "left-1/2 -right-3" : isBackView ? "-left-3 right-1/2" : "-inset-x-3"
+            className={`absolute -top-2.5 -bottom-4 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 ${
+              start === 0 ? "left-1/2 -right-3" : "-inset-x-3"
             }`}
           />
           <div
             aria-hidden
             className={`absolute -bottom-2.5 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] ${
-              start === 0 ? "left-[51%] right-0" : isBackView ? "left-0 right-[51%]" : "inset-x-0"
+              start === 0 ? "left-[51%] right-0" : "inset-x-0"
             }`}
           />
           <FlipBook
@@ -234,7 +233,7 @@ export default function BookReader({
             {/* notebook cover peeking around the page + paper block edge */}
             <div
               aria-hidden
-              className="absolute -inset-x-2 -top-2 -bottom-3.5 rounded-md bg-gradient-to-br from-rose-400 via-rose-500 to-rose-700 shadow-2xl shadow-black/40"
+              className="absolute -inset-x-2 -top-2 -bottom-3.5 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40"
             />
             <div
               aria-hidden
@@ -245,9 +244,11 @@ export default function BookReader({
                 <section
                   key={page.id}
                   aria-label={`Halaman ${page.order + 1}`}
-                  className={`@container paper-texture relative min-h-[70dvh] p-6 md:p-10 ${theme.paper} ${
-                    isSpread ? (i === 0 ? gutterLeft : gutterRight) : ""
-                  }`}
+                  className={`@container relative min-h-[70dvh] p-6 md:p-10 ${
+                    page.layout === "COVER"
+                      ? "bg-[#ff97d0]"
+                      : `paper-texture ${theme.paper}`
+                  } ${isSpread ? (i === 0 ? gutterLeft : gutterRight) : ""}`}
                 >
                   {renderLayout(page, meta, theme)}
                 </section>

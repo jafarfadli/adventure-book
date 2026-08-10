@@ -36,16 +36,34 @@ function TextBlock({
   );
 }
 
-function LayoutCover({ slots, book, theme }: LayoutProps) {
+// Rendered on a pink book-cover surface (bg set by the page container),
+// so it styles itself as a decorated front cover, not a paper page.
+function LayoutCover({ slots, book }: LayoutProps) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
-      <h1 className={`font-hand text-5xl md:text-6xl ${theme.ink}`}>{book.title}</h1>
+    <div className="relative flex h-full flex-col items-center justify-center gap-5 text-center text-white">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-2 rounded-xl border-2 border-dashed border-white/60"
+      />
+      <span aria-hidden className="absolute top-5 left-7 -rotate-12 font-hand text-3xl text-white/70">
+        ✦
+      </span>
+      <span aria-hidden className="absolute top-9 right-7 rotate-12 font-hand text-4xl text-white/70">
+        ♡
+      </span>
+      <span aria-hidden className="absolute bottom-7 left-9 rotate-6 font-hand text-3xl text-white/70">
+        ❀
+      </span>
+      <span aria-hidden className="absolute right-8 bottom-9 -rotate-6 font-hand text-2xl text-white/70">
+        ⋆｡˚
+      </span>
+      <h1 className="font-hand text-5xl drop-shadow-sm md:text-6xl">{book.title}</h1>
       {book.subtitle && (
-        <p className={`font-hand-alt text-xl ${theme.inkSoft}`}>{book.subtitle}</p>
+        <p className="font-hand-alt text-xl text-white/90">{book.subtitle}</p>
       )}
-      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="max-w-56" />}
+      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="max-w-52" />}
       {slots.text1?.text && (
-        <p className={`font-hand text-2xl ${theme.accent}`}>{slots.text1.text}</p>
+        <p className="font-hand text-2xl text-white/90">{slots.text1.text}</p>
       )}
     </div>
   );
