@@ -25,6 +25,10 @@ function emptySlot(key: string, type: "PHOTO" | "TEXT"): SlotData {
     rotation: 0,
     tapeStyle: null,
     dateLabel: null,
+    lat: null,
+    lng: null,
+    locationLabel: null,
+    locationSource: null,
   };
 }
 
@@ -96,6 +100,10 @@ export function PageEditor({
             rotation: s.rotation,
             tapeStyle: s.tapeStyle,
             dateLabel: s.dateLabel,
+            lat: s.lat,
+            lng: s.lng,
+            locationLabel: s.locationLabel,
+            locationSource: s.locationSource as "exif" | "manual" | null,
           });
         }
         setSaved(true);

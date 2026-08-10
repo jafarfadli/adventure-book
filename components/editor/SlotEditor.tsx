@@ -1,9 +1,21 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { useState } from "react";
 import type { SlotSpec } from "@/lib/layouts";
 import { TAPE_STYLES } from "@/lib/tapes";
 import type { SlotData } from "@/lib/types";
 import { ImageUploader } from "./ImageUploader";
+
+// Leaflet touches `window` at import time — client-only, no SSR.
+const LocationPicker = dynamic(() => import("./LocationPicker"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-48 w-full items-center justify-center rounded-md bg-stone-100 text-sm text-stone-400">
+      Memuat peta…
+    </div>
+  ),
+});
 
 const inputCls =
   "rounded-md border border-stone-300 bg-white px-3 py-2 text-base text-stone-800 " +
@@ -46,7 +58,14 @@ export function SlotEditor({
       <span className="text-sm font-medium text-stone-600">{spec.label}</span>
       <ImageUploader
         value={{ imageUrl: value.imageUrl, thumbUrl: value.thumbUrl }}
-        onChange={(m) => onChange({ ...value, ...m })}
+        onChange={(m, gps) => {
+          let next = { ...value, ...m };
+          // EXIF geotag fills the pin only if no manual pin exists (§7.5).
+          if (gps?.lat != null && gps?.lng != null && value.locationSource !== "manual") {
+            next = { ...next, lat: gps.lat, lng: gps.lng, locationSource: "exif" };
+          }
+          onChange(next);
+        }}
       />
       <label className="flex flex-col gap-1 text-sm text-stone-600">
         Caption
@@ -93,6 +112,92 @@ export function SlotEditor({
           onChange={(e) => onChange({ ...value, rotation: Number(e.target.value) })}
         />
       </label>
+      <LocationControl value={value} onChange={onChange} />
+    </div>
+  );
+}
+
+function LocationControl({
+  value,
+  onChange,
+}: {
+  value: SlotData;
+  onChange: (v: SlotData) => void;
+}) {
+  const [showPicker, setShowPicker] = useState(false);
+  const hasLoc = value.lat != null && value.lng != null;
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-stone-200 bg-white/60 p-3">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-stone-600">
+        <span className="font-medium">📍 Lokasi</span>
+        {hasLoc ? (
+          <>
+            <span className="text-stone-500">
+              {value.locationLabel ||
+                `${value.lat!.toFixed(4)}, ${value.lng!.toFixed(4)}`}{" "}
+              {value.locationSource === "exif" ? "(dari foto)" : "(manual)"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowPicker((s) => !s)}
+              className="rounded-md border border-stone-300 px-2 py-1 transition hover:bg-white"
+            >
+              {showPicker ? "Tutup peta" : "Ubah"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowPicker(false);
+                onChange({
+                  ...value,
+                  lat: null,
+                  lng: null,
+                  locationLabel: null,
+                  locationSource: null,
+                });
+              }}
+              className="rounded-md px-2 py-1 text-rose-700 transition hover:bg-rose-50"
+            >
+              Hapus lokasi
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowPicker((s) => !s)}
+            className="rounded-md border border-stone-300 px-2 py-1 transition hover:bg-white"
+          >
+            {showPicker ? "Tutup peta" : "Set lokasi manual"}
+          </button>
+        )}
+      </div>
+      {showPicker && (
+        <>
+          <LocationPicker
+            lat={value.lat}
+            lng={value.lng}
+            onPick={(lat, lng) =>
+              onChange({ ...value, lat, lng, locationSource: "manual" })
+            }
+          />
+          <p className="text-xs text-stone-400">
+            Klik peta untuk menaruh pin, seret pin untuk menggeser. Tersimpan saat
+            &ldquo;Simpan halaman&rdquo;.
+          </p>
+        </>
+      )}
+      {hasLoc && (
+        <label className="flex flex-col gap-1 text-sm text-stone-600">
+          Nama lokasi (mis. Bandung)
+          <input
+            value={value.locationLabel ?? ""}
+            onChange={(e) => onChange({ ...value, locationLabel: e.target.value })}
+            maxLength={120}
+            className={inputCls}
+          />
+        </label>
+      )}
     </div>
   );
 }

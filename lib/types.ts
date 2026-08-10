@@ -12,6 +12,10 @@ export type SlotData = {
   rotation: number;
   tapeStyle: string | null;
   dateLabel: string | null;
+  lat: number | null;
+  lng: number | null;
+  locationLabel: string | null;
+  locationSource: string | null;
 };
 
 export type PageData = {

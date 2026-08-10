@@ -16,15 +16,23 @@ const mediaPathSchema = z
 
 const emptyToNull = (s: string) => (s.trim() === "" ? null : s.trim());
 
-const slotDataSchema = z.object({
-  caption: z.string().max(300).transform(emptyToNull).nullish(),
-  text: z.string().max(5000).transform(emptyToNull).nullish(),
-  imageUrl: mediaPathSchema.nullish(),
-  thumbUrl: mediaPathSchema.nullish(),
-  rotation: z.number().min(-10).max(10).nullish(),
-  tapeStyle: z.string().refine(isTapeStyle, "Gaya selotip tidak dikenal").nullish(),
-  dateLabel: z.string().max(60).transform(emptyToNull).nullish(),
-});
+const slotDataSchema = z
+  .object({
+    caption: z.string().max(300).transform(emptyToNull).nullish(),
+    text: z.string().max(5000).transform(emptyToNull).nullish(),
+    imageUrl: mediaPathSchema.nullish(),
+    thumbUrl: mediaPathSchema.nullish(),
+    rotation: z.number().min(-10).max(10).nullish(),
+    tapeStyle: z.string().refine(isTapeStyle, "Gaya selotip tidak dikenal").nullish(),
+    dateLabel: z.string().max(60).transform(emptyToNull).nullish(),
+    lat: z.number().min(-90).max(90).nullish(),
+    lng: z.number().min(-180).max(180).nullish(),
+    locationLabel: z.string().max(120).transform(emptyToNull).nullish(),
+    locationSource: z.enum(["exif", "manual"]).nullish(),
+  })
+  .refine((d) => (d.lat == null) === (d.lng == null), {
+    message: "lat dan lng harus diisi berpasangan",
+  });
 
 export type SlotInput = z.input<typeof slotDataSchema>;
 
@@ -47,6 +55,28 @@ export async function upsertSlot(pageIdRaw: string, keyRaw: string, dataRaw: Slo
   const spec = LAYOUTS[page.layout].slots.find((s) => s.key === key);
   if (!spec) throw new Error(`Slot "${key}" is not part of layout ${page.layout}`);
 
+  // Location precedence (§7.5): a manual pin is never silently replaced by
+  // EXIF data from a re-upload — only an explicit manual set or clear wins.
+  const existing = await prisma.slot.findUnique({
+    where: { pageId_key: { pageId, key } },
+    select: { lat: true, lng: true, locationLabel: true, locationSource: true },
+  });
+  const hasCoords = data.lat != null && data.lng != null;
+  let location = {
+    lat: hasCoords ? (data.lat as number) : null,
+    lng: hasCoords ? (data.lng as number) : null,
+    locationLabel: hasCoords ? (data.locationLabel ?? null) : null,
+    locationSource: hasCoords ? (data.locationSource ?? "manual") : null,
+  };
+  if (existing?.locationSource === "manual" && location.locationSource === "exif") {
+    location = {
+      lat: existing.lat,
+      lng: existing.lng,
+      locationLabel: existing.locationLabel,
+      locationSource: existing.locationSource,
+    };
+  }
+
   // Only persist the fields that make sense for the slot's type.
   const fields =
     spec.type === "PHOTO"
@@ -57,6 +87,7 @@ export async function upsertSlot(pageIdRaw: string, keyRaw: string, dataRaw: Slo
           rotation: data.rotation ?? 0,
           tapeStyle: data.tapeStyle ?? null,
           dateLabel: data.dateLabel ?? null,
+          ...location,
         }
       : {
           text: data.text ?? null,

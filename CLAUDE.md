@@ -77,6 +77,10 @@ model Slot {
   rotation  Float    @default(0)                // decorative tilt in degrees (approx -6..6)
   tapeStyle String?                             // decorative tape/sticker preset key, nullable
   dateLabel String?                             // optional hand-written date stamp
+  lat       Float?                              // PHOTO: decimal latitude (from EXIF GPS or set manually)
+  lng       Float?                              // PHOTO: decimal longitude
+  locationLabel String?                         // optional human label, e.g. "Bandung"
+  locationSource String?                        // "exif" | "manual" — how lat/lng was set (null if unset)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -149,6 +153,7 @@ Rate-limit `POST /api/session` (e.g. simple in-memory token bucket per IP, 5 tri
 - `/book/[slug]` — public reader. Fetches Book + Pages + Slots (ordered), renders the flip experience. Fully static-friendly / cacheable.
 - `/book/[slug]/unlock` — password form.
 - `/book/[slug]/edit` — editor shell (guarded by `requireEditor`; redirect to `/unlock` if not authorized).
+- `/book/[slug]/map` — **memory map** (see §7.5). Public, read-only. Renders a pin per geotagged photo; ignores photos without coordinates.
 
 **Route Handlers**
 - `POST /api/session` — verify password, set cookie.
@@ -169,14 +174,15 @@ Rate-limit `POST /api/session` (e.g. simple in-memory token bucket per IP, 5 tri
 In `POST /api/upload`:
 1. `requireEditor` — reject anonymous.
 2. Validate: mime in `image/jpeg|png|webp|heic`, size ≤ ~12MB pre-process. Reject otherwise.
-3. Process with **sharp**:
-   - Main: `rotate()` (respect EXIF orientation) → resize to max **1600px** on the long edge (no upscale) → **webp** quality ~82.
+3. **Extract geotag first (before re-encoding strips it).** Read EXIF GPS with `exifr` (`import exifr from "exifr"`): `const { latitude, longitude } = await exifr.gps(buffer) ?? {}`. `exifr` returns decimal degrees directly. If absent or malformed, treat as no geotag (`lat/lng = null`) — never fail the upload over a missing tag. Return `{ lat, lng }` alongside the image paths so the caller can persist them onto the slot.
+4. Process with **sharp**:
+   - Main: `rotate()` (bake in EXIF orientation) → resize to max **1600px** on the long edge (no upscale) → **webp** quality ~82.
    - Thumb: resize to **400px** long edge → webp quality ~70.
-4. Write both to `UPLOAD_DIR` (env, a **persistent** path outside `.next`, e.g. `~/adventure-book/uploads`). Filenames = `${cuid}.webp` / `${cuid}.thumb.webp`.
-5. **Strip metadata** (sharp drops it by default when re-encoding) — no GPS/EXIF leaks in a public book.
-6. Return the public paths (served via `/api/media/...`).
+5. Write both to `UPLOAD_DIR` (env, a **persistent** path outside `.next`, e.g. `~/adventure-book/uploads`). Filenames = `${cuid}.webp` / `${cuid}.thumb.webp`.
+6. **Strip metadata** (sharp drops it by default when re-encoding — never call `.withMetadata()`). The served file carries no GPS/EXIF; the coordinates now live only in the DB, where *you* control them. This is the whole point: the map works, but the public file leaks nothing.
+7. Return the public paths (served via `/api/media/...`) plus `{ lat, lng }`.
 
-Never trust the original filename. Never store absolute disk paths in the DB — store the media route path (e.g. `/api/media/<cuid>.webp`).
+Never trust the original filename. Never store absolute disk paths in the DB — store the media route path (e.g. `/api/media/<cuid>.webp`). The `upsertSlot` action writes `lat`/`lng` (and optional `locationLabel`) when the upload returns them.
 
 ---
 
@@ -195,6 +201,45 @@ Reference the couple's real copy tone: casual, warm, first-person, emoji sparing
 
 ---
 
+## 7.5 Memory map (`/book/[slug]/map`)
+
+A map showing where each geotagged photo was taken. Public, read-only. Ties the whole book together spatially.
+
+**Stack:** `leaflet` + `react-leaflet`. Tiles: **Stamen Watercolor via Stadia Maps** — a hand-painted, paper-textured raster style that matches the scrapbook aesthetic. Set `maxZoom: 16` (the watercolor set thins out above 16 and shows gaps). Keep the required attribution visible: © Stadia Maps, © Stamen Design, © OpenStreetMap.
+
+```
+Tile URL: https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg
+```
+
+**Data:** query all PHOTO slots in the book where `lat` and `lng` are non-null, selecting `lat, lng, thumbUrl, caption, locationLabel` and the parent `page.order` + `book.slug`. Slots without coordinates are excluded here — that *is* the "ignore photos without geotag" handler; no marker is ever created for them.
+
+**Markers:** custom `L.divIcon` styled as a mini polaroid — the photo's `thumbUrl` in a small white frame with a slight tilt, matching the reader's polaroid look. Not the default Leaflet pin.
+
+**Behaviour:**
+- **Auto-fit on load.** `map.fitBounds(bounds, { padding: [48, 48] })` over all markers. Handle the edge cases explicitly:
+  - **1 marker** → `fitBounds` over-zooms; instead `setView([lat, lng], 13)`.
+  - **0 markers** → don't render an empty floating map; show an empty state ("Belum ada foto dengan lokasi 📍") with a link back to the book.
+- **Hover** a marker → popup/tooltip with a larger thumbnail + caption (`bindTooltip` or a controlled popup). On touch devices, tap shows the preview.
+- **Click** a marker → navigate to the reader at that photo's page, e.g. `router.push(withBase(`/book/${slug}?page=${page.order}`))`. The reader reads `?page=` and opens directly to that spread.
+- **Many/clustered pins** → optional `leaflet.markercluster` so dense areas (e.g. lots of photos in one city) stay legible. Nice-to-have, not required for v1.
+- Respect `prefers-reduced-motion`: skip `flyTo` animations, jump directly.
+- Add a small "🗺️ Peta" entry point from the reader chrome.
+
+**Keys/attribution:** tiles load client-side. Stadia works without a key on localhost and many deployments, but for the public Funnel host, register a free Stadia account and use a **domain-restricted** API key — safe to expose as `NEXT_PUBLIC_STADIA_API_KEY` since it's locked to your hostname. Keep attribution controls enabled (it's a licence requirement, not optional chrome).
+
+**Manual location (editor).** Not every photo has a geotag — screenshots, images sent over WhatsApp (strips EXIF), or shots taken with location services off arrive with no coordinates. So each PHOTO slot in the editor gets a **"📍 Lokasi"** control:
+- If the slot already has `lat`/`lng` (from EXIF or a previous manual set), show it on a small map with the pin, plus a "Ubah" and "Hapus lokasi" action.
+- If it has none, show "Set lokasi manual" → opens a small Leaflet picker (same watercolor tiles). Click to drop a pin, drag to fine-tune, "Simpan" writes `lat`/`lng` with `locationSource = "manual"`.
+- "Hapus lokasi" clears `lat`/`lng`/`locationSource` back to null (removes the pin from the map).
+- Precedence: EXIF is written at upload; a manual set overwrites it and flips `locationSource` to `"manual"`. Never silently overwrite a manual pin with EXIF on re-upload — if a slot is already `manual`, keep it unless the editor explicitly clears it.
+- Optional (nice-to-have): after a manual set, reverse-geocode via OSM **Nominatim** to prefill `locationLabel` (respect its usage policy — 1 req/s, include a proper User-Agent; debounce and cache). Skip for v1 if unsure; a manual text field for `locationLabel` is enough.
+
+This is also the backfill path for photos uploaded before geotag capture existed: open the slot, drop a pin, done.
+
+**Server action:** extend `upsertSlot` (or add `setSlotLocation(slotId, { lat, lng, source, label })` / `clearSlotLocation(slotId)`), guarded by `requireEditor`. Validate `lat ∈ [-90, 90]`, `lng ∈ [-180, 180]` with zod; reject anything else.
+
+---
+
 ## 8. Build phases
 
 Ship in order; each phase should be runnable.
@@ -202,9 +247,10 @@ Ship in order; each phase should be runnable.
 - **Phase 0 — Scaffold.** Next.js 15 + TS + Tailwind + Prisma. `schema.prisma` from §3, migrate, and a `prisma/seed.ts` that creates one demo Book (with a bcrypt password from `SEED_EDIT_PASSWORD`) and 3–4 sample pages across different layouts.
 - **Phase 1 — Reader.** `/book/[slug]` renders the ordered pages with polaroid/paper styling and fade-slide navigation. No editing yet. Mobile stacked view + swipe.
 - **Phase 2 — Auth + editor shell.** Unlock flow, `ab_session` cookie, `requireEditor`. `/book/[slug]/edit`: list pages, add page (pick layout from `LAYOUTS`), reorder (drag handle), delete (confirm), edit book title/subtitle/theme.
-- **Phase 3 — Slots + upload.** Per-slot editing driven by `LAYOUTS`: text inputs for TEXT slots, image upload + caption + rotation + date-stamp + tape picker for PHOTO slots. Wire `/api/upload` + sharp. Live preview mirroring the reader render.
+- **Phase 3 — Slots + upload.** Per-slot editing driven by `LAYOUTS`: text inputs for TEXT slots, image upload + caption + rotation + date-stamp + tape picker for PHOTO slots. Wire `/api/upload` + sharp. **Extract EXIF GPS with `exifr` at upload and persist `lat`/`lng` onto the slot (§6)** so the map has data later. Live preview mirroring the reader render.
 - **Phase 4 — Polish.** Theme presets, decorative tape/sticker set, empty states, loading/skeletons, error toasts, cover page editing.
-- **Phase 5 — Nice-to-haves.** 3D page-flip (`react-pageflip` / StPageFlip), optional background-music toggle, timeline/table-of-contents view, export-to-PDF, share sheet.
+- **Phase 5 — Memory map + manual location.** `/book/[slug]/map` per §7.5: Leaflet + react-leaflet, Stamen Watercolor tiles, polaroid `divIcon` markers, auto-fit with 1/0-marker edge cases, hover-preview, click-to-page. Add the editor's "📍 Lokasi" picker (set / adjust / clear a pin per photo slot) — also the backfill path for older photos with no EXIF. Requires Phase 3. Reader entry point + `?page=` deep-link.
+- **Phase 6 — Nice-to-haves.** 3D page-flip (`react-pageflip` / StPageFlip), marker clustering, optional background-music toggle, timeline/table-of-contents view, export-to-PDF, share sheet.
 
 Do not start a later phase until the earlier one runs end-to-end.
 
@@ -268,6 +314,7 @@ SESSION_SECRET=            # jose HS256 signing secret (long random)
 UPLOAD_DIR=                # persistent path, e.g. /Users/<you>/adventure-book/uploads
 DEFAULT_SLUG=our-story     # v1 single-book redirect target
 SEED_EDIT_PASSWORD=        # plaintext used only by prisma/seed.ts to create the bcrypt hash
+NEXT_PUBLIC_STADIA_API_KEY= # optional; domain-restricted Stadia key for watercolor tiles on the public host
 ```
 
 ---

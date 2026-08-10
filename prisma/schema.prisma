@@ -48,6 +48,10 @@ model Slot {
   rotation  Float    @default(0) // decorative tilt in degrees (approx -6..6)
   tapeStyle String? // decorative tape/sticker preset key, nullable
   dateLabel String? // optional hand-written date stamp
+  lat            Float? // PHOTO: decimal latitude (from EXIF GPS or set manually)
+  lng            Float? // PHOTO: decimal longitude
+  locationLabel  String? // optional human label, e.g. "Bandung"
+  locationSource String? // "exif" | "manual" — how lat/lng was set (null if unset)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

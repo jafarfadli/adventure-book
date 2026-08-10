@@ -35,15 +35,17 @@ export const FlipBook = forwardRef<
     pages: PageData[];
     meta: BookMeta;
     theme: Theme;
+    startPage?: number;
     onFlip: (pageIndex: number) => void;
   }
->(function FlipBook({ pages, meta, theme, onFlip }, ref) {
+>(function FlipBook({ pages, meta, theme, startPage = 0, onFlip }, ref) {
   return (
     <HTMLFlipBook
       ref={ref}
       className="mx-auto"
       style={{}}
-      startPage={0}
+      startPage={startPage}
+      renderOnlyPageLengthChange
       size="stretch"
       width={460}
       height={620}

@@ -4,7 +4,10 @@ import BookReader from "@/components/reader/BookReader";
 import { prisma } from "@/lib/db";
 import type { BookData } from "@/lib/types";
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ page?: string }>;
+};
 
 async function fetchBook(slug: string): Promise<BookData | null> {
   const book = await prisma.book.findUnique({
@@ -39,6 +42,10 @@ async function fetchBook(slug: string): Promise<BookData | null> {
         rotation: slot.rotation,
         tapeStyle: slot.tapeStyle,
         dateLabel: slot.dateLabel,
+        lat: slot.lat,
+        lng: slot.lng,
+        locationLabel: slot.locationLabel,
+        locationSource: slot.locationSource,
       })),
     })),
   };
@@ -62,9 +69,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function BookPage({ params }: Props) {
+export default async function BookPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const book = await fetchBook(slug);
   if (!book) notFound();
-  return <BookReader book={book} />;
+
+  // ?page= deep link (used by the memory map's click-to-page)
+  const { page } = await searchParams;
+  const parsed = Number.parseInt(page ?? "", 10);
+  const initialPage = Number.isFinite(parsed)
+    ? Math.min(Math.max(parsed, 0), Math.max(book.pages.length - 1, 0))
+    : 0;
+
+  return <BookReader book={book} initialPage={initialPage} />;
 }

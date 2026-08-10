@@ -5,13 +5,15 @@ import { useToast } from "@/components/ui/Toaster";
 import { withBase } from "@/lib/basePath";
 
 type Media = { imageUrl: string | null; thumbUrl: string | null };
+export type UploadGps = { lat: number | null; lng: number | null };
 
 export function ImageUploader({
   value,
   onChange,
 }: {
   value: Media;
-  onChange: (v: Media) => void;
+  /** gps is present only right after a fresh upload (EXIF geotag, if any). */
+  onChange: (v: Media, gps?: UploadGps) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const toast = useToast();
@@ -26,10 +28,19 @@ export function ImageUploader({
       fd.append("file", file);
       const res = await fetch(withBase("/api/upload"), { method: "POST", body: fd });
       const data = (await res.json().catch(() => null)) as
-        | { imageUrl?: string; thumbUrl?: string; error?: string }
+        | {
+            imageUrl?: string;
+            thumbUrl?: string;
+            lat?: number | null;
+            lng?: number | null;
+            error?: string;
+          }
         | null;
       if (res.ok && data?.imageUrl && data?.thumbUrl) {
-        onChange({ imageUrl: data.imageUrl, thumbUrl: data.thumbUrl });
+        onChange(
+          { imageUrl: data.imageUrl, thumbUrl: data.thumbUrl },
+          { lat: data.lat ?? null, lng: data.lng ?? null },
+        );
       } else {
         toast(data?.error ?? "Upload gagal. Coba lagi, ya.");
       }

@@ -12,13 +12,19 @@ import { TocOverlay } from "./TocOverlay";
 
 const SWIPE_THRESHOLD_PX = 48;
 
-export default function BookReader({ book }: { book: BookData }) {
+export default function BookReader({
+  book,
+  initialPage = 0,
+}: {
+  book: BookData;
+  initialPage?: number;
+}) {
   const theme = getTheme(book.theme);
   const { pages } = book;
   const meta = { title: book.title, subtitle: book.subtitle };
 
   const [isSpread, setIsSpread] = useState(false);
-  const [start, setStart] = useState(0);
+  const [start, setStart] = useState(initialPage);
   const [dir, setDir] = useState(1);
   const [tocOpen, setTocOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -139,6 +145,13 @@ export default function BookReader({ book }: { book: BookData }) {
       }}
     >
       <div className="fixed top-4 right-4 z-30 flex items-center gap-4">
+        <Link
+          href={`/book/${book.slug}/map`}
+          className={`font-hand text-lg opacity-50 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
+          aria-label="Buka peta kenangan"
+        >
+          🗺️ peta
+        </Link>
         <button
           type="button"
           onClick={() => setTocOpen(true)}
@@ -164,6 +177,7 @@ export default function BookReader({ book }: { book: BookData }) {
             pages={pages}
             meta={meta}
             theme={theme}
+            startPage={initialPage}
             onFlip={setStart}
           />
         </div>

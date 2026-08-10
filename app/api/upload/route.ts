@@ -1,6 +1,31 @@
+import exifr from "exifr";
 import { NextRequest, NextResponse } from "next/server";
 import { getEditorBookId } from "@/lib/auth";
 import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, processUpload } from "@/lib/images";
+
+/**
+ * Read EXIF GPS before sharp re-encodes (which strips all metadata).
+ * A missing or malformed geotag must never fail the upload.
+ */
+async function extractGps(
+  buffer: Buffer,
+): Promise<{ lat: number | null; lng: number | null }> {
+  try {
+    const gps = await exifr.gps(buffer);
+    if (
+      gps &&
+      Number.isFinite(gps.latitude) &&
+      Number.isFinite(gps.longitude) &&
+      Math.abs(gps.latitude) <= 90 &&
+      Math.abs(gps.longitude) <= 180
+    ) {
+      return { lat: gps.latitude, lng: gps.longitude };
+    }
+  } catch {
+    // corrupt/unsupported EXIF — treat as no geotag
+  }
+  return { lat: null, lng: null };
+}
 
 export async function POST(req: NextRequest) {
   // requireEditor before any side effect; upload is scoped by the session itself.
@@ -29,8 +54,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
+    const gps = await extractGps(buffer);
     const result = await processUpload(buffer);
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, ...gps });
   } catch {
     // e.g. HEIC without libheif support, or a corrupt file.
     return NextResponse.json(
