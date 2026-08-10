@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { BookData } from "@/lib/types";
@@ -124,6 +125,13 @@ export default function BookReader({ book }: { book: BookData }) {
         onNext={next}
         theme={theme}
       />
+      <Link
+        href={`/book/${book.slug}/unlock`}
+        className={`fixed right-4 bottom-4 font-hand text-lg opacity-40 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
+        aria-label="Buka mode edit"
+      >
+        ✎ edit
+      </Link>
     </main>
   );
 }

@@ -1,10 +1,5 @@
+import { TAPE_STYLES } from "@/lib/tapes";
 import type { SlotData } from "@/lib/types";
-
-const TAPE_STYLES: Record<string, string> = {
-  classic: "bg-amber-100/70",
-  pink: "bg-rose-200/70",
-  mint: "bg-emerald-200/60",
-};
 
 export function PolaroidFrame({
   slot,
@@ -14,7 +9,9 @@ export function PolaroidFrame({
   className?: string;
 }) {
   const alt = slot.caption || "foto kenangan";
-  const tape = slot.tapeStyle ? (TAPE_STYLES[slot.tapeStyle] ?? TAPE_STYLES.classic) : null;
+  const tape = slot.tapeStyle
+    ? (TAPE_STYLES[slot.tapeStyle] ?? TAPE_STYLES.classic).className
+    : null;
 
   return (
     <figure

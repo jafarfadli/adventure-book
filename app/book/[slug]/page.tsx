@@ -48,12 +48,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const book = await prisma.book.findUnique({
     where: { slug },
-    select: { title: true, subtitle: true },
+    select: { title: true, subtitle: true, coverImageUrl: true },
   });
   if (!book) return {};
   return {
     title: book.title,
     description: book.subtitle ?? undefined,
+    openGraph: {
+      title: book.title,
+      description: book.subtitle ?? undefined,
+      images: book.coverImageUrl ? [book.coverImageUrl] : undefined,
+    },
   };
 }
 

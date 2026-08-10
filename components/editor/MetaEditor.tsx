@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { updateBookMeta } from "@/actions/book";
+import { useToast } from "@/components/ui/Toaster";
 import { THEMES } from "@/lib/themes";
+import { ImageUploader } from "./ImageUploader";
 
 const THEME_LABELS: Record<string, string> = {
   cream: "Krem",
@@ -19,25 +21,30 @@ export function MetaEditor({
   initial,
 }: {
   bookId: string;
-  initial: { title: string; subtitle: string | null; theme: string };
+  initial: {
+    title: string;
+    subtitle: string | null;
+    theme: string;
+    coverImageUrl: string | null;
+  };
 }) {
   const [title, setTitle] = useState(initial.title);
   const [subtitle, setSubtitle] = useState(initial.subtitle ?? "");
   const [theme, setTheme] = useState(initial.theme);
+  const [coverImageUrl, setCoverImageUrl] = useState(initial.coverImageUrl);
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaved(false);
-    setError(null);
     startTransition(async () => {
       try {
-        await updateBookMeta(bookId, { title, subtitle, theme });
+        await updateBookMeta(bookId, { title, subtitle, theme, coverImageUrl });
         setSaved(true);
       } catch {
-        setError("Gagal menyimpan. Coba lagi, ya.");
+        toast("Gagal menyimpan info buku. Coba lagi, ya.");
       }
     });
   }
@@ -69,6 +76,13 @@ export function MetaEditor({
           className={inputCls}
         />
       </label>
+      <div className="flex flex-col gap-1 text-sm text-stone-600">
+        Foto sampul (untuk pratinjau tautan saat dibagikan)
+        <ImageUploader
+          value={{ imageUrl: coverImageUrl, thumbUrl: coverImageUrl }}
+          onChange={(m) => setCoverImageUrl(m.imageUrl)}
+        />
+      </div>
       <label className="flex flex-col gap-1 text-sm text-stone-600">
         Tema
         <select
@@ -92,11 +106,6 @@ export function MetaEditor({
           {pending ? "Menyimpan…" : "Simpan"}
         </button>
         {saved && <span className="text-sm text-emerald-700">Tersimpan ✓</span>}
-        {error && (
-          <span role="alert" className="text-sm text-rose-700">
-            {error}
-          </span>
-        )}
       </div>
     </form>
   );

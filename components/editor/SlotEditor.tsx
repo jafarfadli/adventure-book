@@ -1,6 +1,7 @@
 "use client";
 
 import type { SlotSpec } from "@/lib/layouts";
+import { TAPE_STYLES } from "@/lib/tapes";
 import type { SlotData } from "@/lib/types";
 import { ImageUploader } from "./ImageUploader";
 
@@ -10,9 +11,10 @@ const inputCls =
 
 const TAPE_OPTIONS = [
   { value: "", label: "Tanpa selotip" },
-  { value: "classic", label: "Selotip krem" },
-  { value: "pink", label: "Selotip pink" },
-  { value: "mint", label: "Selotip mint" },
+  ...Object.entries(TAPE_STYLES).map(([value, { label }]) => ({
+    value,
+    label: `Selotip ${label.toLowerCase()}`,
+  })),
 ];
 
 export function SlotEditor({

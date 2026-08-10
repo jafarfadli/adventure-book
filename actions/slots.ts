@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireEditor } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { LAYOUTS } from "@/lib/layouts";
+import { isTapeStyle } from "@/lib/tapes";
 
 const cuidSchema = z.string().min(1).max(64);
 const mediaPathSchema = z
@@ -20,7 +21,7 @@ const slotDataSchema = z.object({
   imageUrl: mediaPathSchema.nullish(),
   thumbUrl: mediaPathSchema.nullish(),
   rotation: z.number().min(-10).max(10).nullish(),
-  tapeStyle: z.enum(["classic", "pink", "mint"]).nullish(),
+  tapeStyle: z.string().refine(isTapeStyle, "Gaya selotip tidak dikenal").nullish(),
   dateLabel: z.string().max(60).transform(emptyToNull).nullish(),
 });
 

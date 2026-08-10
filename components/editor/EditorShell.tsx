@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ToastProvider } from "@/components/ui/Toaster";
 import type { PageData } from "@/lib/types";
 import { AddPageForm } from "./AddPageForm";
 import { MetaEditor } from "./MetaEditor";
@@ -17,6 +18,7 @@ export function EditorShell({
     title: string;
     subtitle: string | null;
     theme: string;
+    coverImageUrl: string | null;
     pages: PageData[];
   };
 }) {
@@ -31,7 +33,8 @@ export function EditorShell({
   }
 
   return (
-    <main className="min-h-dvh flex-1 bg-stone-100">
+    <ToastProvider>
+      <main className="min-h-dvh flex-1 bg-stone-100">
       <div className="mx-auto flex max-w-2xl flex-col gap-6 p-4 py-8 md:p-8">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -58,7 +61,12 @@ export function EditorShell({
 
         <MetaEditor
           bookId={book.id}
-          initial={{ title: book.title, subtitle: book.subtitle, theme: book.theme }}
+          initial={{
+            title: book.title,
+            subtitle: book.subtitle,
+            theme: book.theme,
+            coverImageUrl: book.coverImageUrl,
+          }}
         />
 
         <section className="flex flex-col gap-3">
@@ -74,6 +82,7 @@ export function EditorShell({
           <AddPageForm bookId={book.id} />
         </section>
       </div>
-    </main>
+      </main>
+    </ToastProvider>
   );
 }

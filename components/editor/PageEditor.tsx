@@ -4,6 +4,7 @@ import { Layout } from "@prisma/client";
 import { useEffect, useState, useTransition } from "react";
 import { setPageLayout, upsertSlot } from "@/actions/slots";
 import { renderLayout, type BookMeta } from "@/components/reader/layouts";
+import { useToast } from "@/components/ui/Toaster";
 import { LAYOUTS } from "@/lib/layouts";
 import { getTheme } from "@/lib/themes";
 import type { PageData, SlotData } from "@/lib/types";
@@ -51,8 +52,8 @@ export function PageEditor({
 }) {
   const [slots, setSlots] = useState(() => slotsFromPage(page));
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
 
   // Adopt fresh server state after saves / layout switches.
   useEffect(() => setSlots(slotsFromPage(page)), [page]);
@@ -72,19 +73,17 @@ export function PageEditor({
       );
       if (!ok) return;
     }
-    setError(null);
     startTransition(async () => {
       try {
         await setPageLayout(page.id, next);
       } catch {
-        setError("Gagal mengganti layout. Coba lagi, ya.");
+        toast("Gagal mengganti layout. Coba lagi, ya.");
       }
     });
   }
 
   function onSave() {
     setSaved(false);
-    setError(null);
     startTransition(async () => {
       try {
         for (const spec of specs) {
@@ -95,13 +94,13 @@ export function PageEditor({
             imageUrl: s.imageUrl,
             thumbUrl: s.thumbUrl,
             rotation: s.rotation,
-            tapeStyle: (s.tapeStyle ?? null) as "classic" | "pink" | "mint" | null,
+            tapeStyle: s.tapeStyle,
             dateLabel: s.dateLabel,
           });
         }
         setSaved(true);
       } catch {
-        setError("Gagal menyimpan. Coba lagi, ya.");
+        toast("Gagal menyimpan halaman. Coba lagi, ya.");
       }
     });
   }
@@ -146,11 +145,6 @@ export function PageEditor({
               {pending ? "Menyimpan…" : "Simpan halaman"}
             </button>
             {saved && <span className="text-sm text-emerald-700">Tersimpan ✓</span>}
-            {error && (
-              <span role="alert" className="text-sm text-rose-700">
-                {error}
-              </span>
-            )}
           </div>
         </div>
 

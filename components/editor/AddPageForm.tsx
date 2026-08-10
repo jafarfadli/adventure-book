@@ -2,22 +2,22 @@
 
 import { useState, useTransition } from "react";
 import { createPage } from "@/actions/pages";
+import { useToast } from "@/components/ui/Toaster";
 import { LAYOUTS } from "@/lib/layouts";
 import { Layout } from "@prisma/client";
 
 export function AddPageForm({ bookId }: { bookId: string }) {
   const [layout, setLayout] = useState<Layout>(Layout.SINGLE);
-  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     startTransition(async () => {
       try {
         await createPage(bookId, layout);
       } catch {
-        setError("Gagal menambah halaman. Coba lagi, ya.");
+        toast("Gagal menambah halaman. Coba lagi, ya.");
       }
     });
   }
@@ -48,11 +48,6 @@ export function AddPageForm({ bookId }: { bookId: string }) {
       >
         {pending ? "Menambah…" : "+ Tambah halaman"}
       </button>
-      {error && (
-        <p role="alert" className="w-full text-sm text-rose-700">
-          {error}
-        </p>
-      )}
     </form>
   );
 }

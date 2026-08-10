@@ -19,6 +19,7 @@ export default async function EditPage({ params }: Props) {
       title: true,
       subtitle: true,
       theme: true,
+      coverImageUrl: true,
       pages: {
         orderBy: { order: "asc" },
         select: {

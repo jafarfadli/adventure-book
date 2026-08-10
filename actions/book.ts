@@ -14,11 +14,20 @@ const metaSchema = z.object({
     .max(200)
     .transform((s) => (s === "" ? null : s)),
   theme: z.string().refine((t) => t in THEMES, "Tema tidak dikenal"),
+  coverImageUrl: z
+    .string()
+    .regex(/^\/api\/media\/[A-Za-z0-9-]+(\.thumb)?\.webp$/, "Path media tidak valid")
+    .nullable(),
 });
 
 export async function updateBookMeta(
   bookIdRaw: string,
-  metaRaw: { title: string; subtitle: string; theme: string },
+  metaRaw: {
+    title: string;
+    subtitle: string;
+    theme: string;
+    coverImageUrl: string | null;
+  },
 ) {
   const bookId = z.string().min(1).max(64).parse(bookIdRaw);
   const meta = metaSchema.parse(metaRaw);

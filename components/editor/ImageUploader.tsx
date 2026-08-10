@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/Toaster";
 
 type Media = { imageUrl: string | null; thumbUrl: string | null };
 
@@ -12,14 +13,13 @@ export function ImageUploader({
   onChange: (v: Media) => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const input = e.currentTarget;
     const file = input.files?.[0];
     if (!file) return;
     setBusy(true);
-    setError(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -30,10 +30,10 @@ export function ImageUploader({
       if (res.ok && data?.imageUrl && data?.thumbUrl) {
         onChange({ imageUrl: data.imageUrl, thumbUrl: data.thumbUrl });
       } else {
-        setError(data?.error ?? "Upload gagal. Coba lagi, ya.");
+        toast(data?.error ?? "Upload gagal. Coba lagi, ya.");
       }
     } catch {
-      setError("Upload gagal. Coba lagi, ya.");
+      toast("Upload gagal. Coba lagi, ya.");
     } finally {
       setBusy(false);
       input.value = "";
@@ -74,11 +74,6 @@ export function ImageUploader({
           >
             Hapus foto
           </button>
-        )}
-        {error && (
-          <p role="alert" className="text-rose-700">
-            {error}
-          </p>
         )}
       </div>
     </div>

@@ -4,6 +4,7 @@ import { Reorder } from "framer-motion";
 import { useEffect, useState, useTransition } from "react";
 import { deletePage, reorderPages } from "@/actions/pages";
 import type { BookMeta } from "@/components/reader/layouts";
+import { useToast } from "@/components/ui/Toaster";
 import { LAYOUTS } from "@/lib/layouts";
 import type { PageData } from "@/lib/types";
 import { PageEditor } from "./PageEditor";
@@ -21,8 +22,8 @@ export function PageList({
 }) {
   const [items, setItems] = useState(pages);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
 
   // Adopt fresh server data after create/delete/reorder revalidation.
   useEffect(() => setItems(pages), [pages]);
@@ -31,12 +32,11 @@ export function PageList({
     const currentIds = items.map((p) => p.id);
     const serverIds = pages.map((p) => p.id);
     if (currentIds.join() === serverIds.join()) return;
-    setError(null);
     startTransition(async () => {
       try {
         await reorderPages(bookId, currentIds);
       } catch {
-        setError("Gagal menyimpan urutan. Coba lagi, ya.");
+        toast("Gagal menyimpan urutan. Coba lagi, ya.");
         setItems(pages);
       }
     });
@@ -45,12 +45,11 @@ export function PageList({
   function onDelete(page: PageData) {
     const label = LAYOUTS[page.layout].label;
     if (!confirm(`Hapus halaman "${label}"? Isi halaman ikut terhapus.`)) return;
-    setError(null);
     startTransition(async () => {
       try {
         await deletePage(page.id);
       } catch {
-        setError("Gagal menghapus halaman. Coba lagi, ya.");
+        toast("Gagal menghapus halaman. Coba lagi, ya.");
       }
     });
   }
@@ -119,11 +118,6 @@ export function PageList({
           );
         })}
       </Reorder.Group>
-      {error && (
-        <p role="alert" className="text-sm text-rose-700">
-          {error}
-        </p>
-      )}
     </div>
   );
 }
