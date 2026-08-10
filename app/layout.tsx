@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Caveat, Inter, Kalam } from "next/font/google";
 import "./globals.css";
 
@@ -13,6 +13,13 @@ const kalam = Kalam({
 export const metadata: Metadata = {
   title: "Adventure Book",
   description: "Buku kenangan interaktif untuk cerita kita berdua.",
+};
+
+// The design is light-only. "only light" also opts out of Chrome Android's
+// forced auto-dark theming, which otherwise mangles the colors.
+export const viewport: Viewport = {
+  colorScheme: "only light",
+  themeColor: "#ff97d0",
 };
 
 export default function RootLayout({

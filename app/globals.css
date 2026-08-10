@@ -6,6 +6,11 @@
   --font-hand-alt: var(--font-kalam);
 }
 
+:root {
+  /* Light-only design; keeps UA form controls and auto-darkening in check. */
+  color-scheme: only light;
+}
+
 body {
   font-family: var(--font-inter), system-ui, sans-serif;
 }
