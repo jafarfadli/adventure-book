@@ -293,10 +293,10 @@ This app is **not** served at the domain root. The Mac mini runs several apps be
 - PostgreSQL via Homebrew; run `prisma migrate deploy` on release.
 - `next build` then run under **PM2**: `PORT=3002 pm2 start npm --name adventure-book -- start`, then `pm2 save`.
 - Confirm nothing else already occupies 3002 — `lsof -i :3002` should be empty before first start.
-- Expose via **Tailscale Funnel** under the `/adventure` path (background mode):
+- Expose via **Tailscale Funnel** under the `/adventure` path (background mode). Gotcha: `--set-path` **strips** the prefix before proxying, but Next expects it because of `basePath` — so the proxy target must include `/adventure` too:
   ```bash
-  tailscale funnel --bg --set-path=/adventure localhost:3002
-  tailscale funnel status        # verify the mapping
+  tailscale funnel --bg --set-path=/adventure http://127.0.0.1:3002/adventure
+  tailscale funnel status        # verify: /adventure proxy http://127.0.0.1:3002/adventure
   ```
   Public URL: `https://jafars-mac-mini.tail9e540f.ts.net/adventure`. Funnel always serves HTTPS, so keep the session cookie `Secure`.
 - `UPLOAD_DIR` lives on local disk outside the build dir; include it in your backup routine (photos are irreplaceable).
