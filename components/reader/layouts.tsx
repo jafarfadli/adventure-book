@@ -44,11 +44,13 @@ function LayoutSingle({ slots }: LayoutProps) {
   );
 }
 
+// Layout switches below use container queries (@xl etc.) so a page adapts to
+// its own width — a flip-book page is ~450px wide even on a wide viewport.
 function LayoutDuo({ slots }: LayoutProps) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-8 sm:flex-row">
-      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="max-w-56" />}
-      {slots.photo2 && <PolaroidFrame slot={slots.photo2} className="max-w-56" />}
+    <div className="flex h-full flex-col items-center justify-center gap-6 @xl:flex-row @xl:gap-8">
+      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="max-w-44 @xl:max-w-56" />}
+      {slots.photo2 && <PolaroidFrame slot={slots.photo2} className="max-w-44 @xl:max-w-56" />}
     </div>
   );
 }
@@ -56,17 +58,21 @@ function LayoutDuo({ slots }: LayoutProps) {
 function LayoutTrio({ slots }: LayoutProps) {
   return (
     <div className="flex h-full flex-wrap items-center justify-center gap-6">
-      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="max-w-48" />}
-      {slots.photo2 && <PolaroidFrame slot={slots.photo2} className="max-w-48 sm:translate-y-6" />}
-      {slots.photo3 && <PolaroidFrame slot={slots.photo3} className="max-w-48" />}
+      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="max-w-40 @xl:max-w-48" />}
+      {slots.photo2 && (
+        <PolaroidFrame slot={slots.photo2} className="max-w-40 @xl:max-w-48 @xl:translate-y-6" />
+      )}
+      {slots.photo3 && <PolaroidFrame slot={slots.photo3} className="max-w-40 @xl:max-w-48" />}
     </div>
   );
 }
 
 function LayoutPhotoText({ slots, theme }: LayoutProps) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-8 md:flex-row">
-      {slots.photo1 && <PolaroidFrame slot={slots.photo1} className="shrink-0 max-w-60" />}
+    <div className="flex h-full flex-col items-center justify-center gap-6 @xl:flex-row @xl:gap-8">
+      {slots.photo1 && (
+        <PolaroidFrame slot={slots.photo1} className="shrink-0 max-w-48 @xl:max-w-60" />
+      )}
       <TextBlock slot={slots.text1} theme={theme} className="max-w-prose" />
     </div>
   );
