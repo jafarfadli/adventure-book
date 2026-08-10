@@ -7,7 +7,7 @@ import { IconList, IconMapPin, IconPencil, IconShare } from "@/components/ui/ico
 import type { BookData } from "@/lib/types";
 import { getTheme } from "@/lib/themes";
 import { CuteBackdrop } from "./CuteBackdrop";
-import { FlipBook, type FlipBookHandle, type FlipOrientation } from "./FlipBook";
+import { FlipBook, type FlipBookHandle } from "./FlipBook";
 import { MusicToggle } from "./MusicToggle";
 import { renderLayout } from "./layouts";
 import { PageNav } from "./PageNav";
@@ -31,7 +31,9 @@ export default function BookReader({
   );
 
   const [isSpread, setIsSpread] = useState(false);
-  const [orientation, setOrientation] = useState<FlipOrientation>("landscape");
+  // Which page of the open spread the narrow-screen camera is looking at:
+  // 0 = left, 1 = right. The closed cover sits on the right half.
+  const [half, setHalf] = useState<0 | 1>(1);
   const [start, setStart] = useState(initialPage);
   const [dir, setDir] = useState(1);
   const [tocOpen, setTocOpen] = useState(false);
@@ -48,15 +50,16 @@ export default function BookReader({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const flipMode = mounted ? !reducedMotion : true;
-  const isPortrait = orientation === "portrait";
+  // Narrow screens keep the two-page spread but only show one page at a
+  // time, panning the book sideways instead of shrinking it.
+  const cameraMode = flipMode && !isSpread;
   const perView = isSpread && !flipMode ? 2 : 1;
 
-  // Landscape pairs pages (1,2)(3,4)… so only 0 and odd indices are valid
-  // view starts; portrait shows every page on its own. Normalizing with the
-  // wrong grid corrupts deep-linked positions.
+  // The book pairs pages (1,2)(3,4)…, so only 0 and odd indices are valid
+  // view starts. Normalizing with the wrong grid corrupts deep links.
   const toFlipIndex = useCallback(
-    (i: number) => (isPortrait ? i : i === 0 ? 0 : i % 2 === 1 ? i : i - 1),
-    [isPortrait],
+    (i: number) => (i === 0 ? 0 : i % 2 === 1 ? i : i - 1),
+    [],
   );
   const flipInitial = toFlipIndex(initialPage);
 
@@ -95,26 +98,41 @@ export default function BookReader({
     } else {
       setStart(isSpread ? initialPage - (initialPage % 2) : initialPage);
     }
+    setHalf(initialPage === 0 ? 1 : initialPage % 2 === 1 ? 0 : 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPage, flipMode, isPortrait]);
+  }, [initialPage, flipMode]);
 
   const next = useCallback(() => {
     if (flipMode) {
-      flipRef.current?.pageFlip().flipNext();
+      // Panning across the open spread costs no page turn: only crossing to
+      // the next spread actually flips paper.
+      if (cameraMode && start > 0 && half === 0 && start + 1 < pages.length) {
+        setHalf(1);
+        return;
+      }
+      if (cameraMode) setHalf(0);
+      flipRef.current?.pageFlip()?.flipNext();
       return;
     }
     setDir(1);
     setStart((s) => (s + perView >= pages.length ? s : s + perView));
-  }, [flipMode, perView, pages.length]);
+  }, [flipMode, cameraMode, start, half, perView, pages.length]);
 
   const prev = useCallback(() => {
     if (flipMode) {
-      flipRef.current?.pageFlip().flipPrev();
+      if (cameraMode && half === 1 && start > 0) {
+        setHalf(0);
+        return;
+      }
+      // Flipping back lands on the previous spread's right-hand page (and
+      // the closed cover also sits on the right half).
+      if (cameraMode) setHalf(1);
+      flipRef.current?.pageFlip()?.flipPrev();
       return;
     }
     setDir(-1);
     setStart((s) => Math.max(0, s - perView));
-  }, [flipMode, perView]);
+  }, [flipMode, cameraMode, half, start, perView]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -131,13 +149,14 @@ export default function BookReader({
     (i: number) => {
       setTocOpen(false);
       if (flipMode) {
+        if (cameraMode) setHalf(i === 0 ? 1 : i % 2 === 1 ? 0 : 1);
         flipRef.current?.pageFlip()?.turnToPage(toFlipIndex(i));
         return;
       }
       setDir(i >= start ? 1 : -1);
       setStart(isSpread ? i - (i % 2) : i);
     },
-    [flipMode, isSpread, start, toFlipIndex],
+    [flipMode, cameraMode, isSpread, start, toFlipIndex],
   );
 
   async function share() {
@@ -166,22 +185,26 @@ export default function BookReader({
     );
   }
 
+  // Index of the page the camera is actually on (narrow screens only).
+  const camIndex = start === 0 ? 0 : start + half;
   const canPrev = start > 0;
-  // Landscape: last view starts at len-1 (even books, filler added) or len-2
-  // (odd books). Portrait advances one page at a time.
-  const canNext = flipMode
-    ? isPortrait
-      ? start < pages.length - 1
+  const canNext = !flipMode
+    ? start + perView < pages.length
+    : cameraMode
+      ? camIndex + 1 < pages.length
       : start === 0
         ? pages.length > 1
-        : start + 2 < pages.length
-    : start + perView < pages.length;
+        : start + 2 < pages.length;
   const visible = pages.slice(start, start + perView);
-  const label =
-    flipMode && !isPortrait && start > 0 && start + 1 < pages.length
-      ? `hal. ${start + 1}–${start + 2} / ${pages.length}`
-      : !flipMode && isSpread && visible.length === 2
-        ? `hal. ${start + 1}–${start + 2} / ${pages.length}`
+  const spreadLabel = `hal. ${start + 1}–${start + 2} / ${pages.length}`;
+  const label = cameraMode
+    ? `hal. ${camIndex + 1} / ${pages.length}`
+    : flipMode
+      ? start > 0 && start + 1 < pages.length
+        ? spreadLabel
+        : `hal. ${start + 1} / ${pages.length}`
+      : isSpread && visible.length === 2
+        ? spreadLabel
         : `hal. ${start + 1} / ${pages.length}`;
   const duration = reducedMotion ? 0 : 0.35;
   const gutterLeft = "md:shadow-[inset_-28px_0_28px_-28px_rgba(0,0,0,0.35)]";
@@ -191,11 +214,12 @@ export default function BookReader({
     <main
       className={`relative flex min-h-dvh flex-1 flex-col items-center justify-center gap-6 overflow-hidden px-4 pt-16 pb-4 md:px-8 md:pt-20 md:pb-8 ${theme.backdrop}`}
       onTouchStart={(e) => {
-        if (flipMode) return;
+        // In camera mode StPageFlip's own drag is off, so swipes are ours.
+        if (flipMode && !cameraMode) return;
         touchX.current = e.touches[0].clientX;
       }}
       onTouchEnd={(e) => {
-        if (flipMode || touchX.current === null) return;
+        if ((flipMode && !cameraMode) || touchX.current === null) return;
         const dx = e.changedTouches[0].clientX - touchX.current;
         touchX.current = null;
         if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
@@ -249,25 +273,46 @@ export default function BookReader({
           <div
             aria-hidden
             className={`absolute -top-2.5 -bottom-4 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 ${
-              !isPortrait && start === 0 ? "left-1/2 -right-3" : "-inset-x-3"
+              !cameraMode && start === 0 ? "left-1/2 -right-3" : "-inset-x-3"
             }`}
           />
           <div
             aria-hidden
             className={`absolute -bottom-2.5 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] ${
-              !isPortrait && start === 0 ? "left-[51%] right-0" : "inset-x-0"
+              !cameraMode && start === 0 ? "left-[51%] right-0" : "inset-x-0"
             }`}
           />
-          <FlipBook
-            ref={flipRef}
-            pages={pages}
-            meta={meta}
-            theme={theme}
-            startPage={flipInitial}
-            withFiller={isSpread}
-            onFlip={setStart}
-            onOrientation={setOrientation}
-          />
+          {cameraMode ? (
+            // Window onto a book that is twice as wide as the screen: the
+            // spread stays intact and slides under the cover frame.
+            <div className="relative overflow-hidden">
+              <div
+                className="w-[200%] transition-transform duration-[650ms] ease-in-out"
+                style={{ transform: `translateX(${half === 1 ? "-50%" : "0%"})` }}
+              >
+                <FlipBook
+                  key="camera"
+                  ref={flipRef}
+                  pages={pages}
+                  meta={meta}
+                  theme={theme}
+                  startPage={flipInitial}
+                  useMouseEvents={false}
+                  onFlip={setStart}
+                />
+              </div>
+            </div>
+          ) : (
+            <FlipBook
+              key="full"
+              ref={flipRef}
+              pages={pages}
+              meta={meta}
+              theme={theme}
+              startPage={flipInitial}
+              onFlip={setStart}
+            />
+          )}
         </div>
       ) : (
         <AnimatePresence mode="wait" initial={false}>

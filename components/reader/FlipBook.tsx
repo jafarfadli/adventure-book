@@ -15,17 +15,14 @@ export type PageFlipApi = {
 
 export type FlipBookHandle = { pageFlip: () => PageFlipApi };
 
-export type FlipOrientation = "portrait" | "landscape";
-
-// Binding seam. Landscape (md+) pairs pages (1,2)(3,4)…, so odd indices sit
-// on the left of a spread (seam right) and even ones on the right (seam
-// left). Portrait shows one page at a time — the binding is always on the
-// left. Expressed in CSS so orientation changes need no re-render.
+// Binding seam. The book always renders as a spread pairing (1,2)(3,4)…, so
+// odd indices sit on the left of a spread (seam on their right) and even
+// ones on the right (seam on their left). Index 0 is the closed cover.
 function gutterClass(index: number): string {
   if (index === 0) return "";
-  const seamLeft = "border-l border-black/10 shadow-[inset_28px_0_28px_-28px_rgba(0,0,0,0.25)]";
-  if (index % 2 === 0) return seamLeft;
-  return `${seamLeft} md:border-l-0 md:border-r md:border-black/10 md:shadow-[inset_-28px_0_28px_-28px_rgba(0,0,0,0.25)]`;
+  return index % 2 === 1
+    ? "border-r border-black/10 shadow-[inset_-28px_0_28px_-28px_rgba(0,0,0,0.25)]"
+    : "border-l border-black/10 shadow-[inset_28px_0_28px_-28px_rgba(0,0,0,0.25)]";
 }
 
 // StPageFlip requires each page child to forward its DOM ref.
@@ -69,16 +66,19 @@ export const FlipBook = forwardRef<
     meta: BookMeta;
     theme: Theme;
     startPage?: number;
-    /** Landscape-only trailing blank page (see FillerPage). */
-    withFiller?: boolean;
+    /**
+     * Off when the reader pans a narrow viewport across the spread itself —
+     * StPageFlip's own drag would fight those swipes. Read once at init, so
+     * the reader remounts this component when the mode changes.
+     */
+    useMouseEvents?: boolean;
     onFlip: (pageIndex: number) => void;
-    onOrientation?: (orientation: FlipOrientation) => void;
   }
 >(function FlipBook(
-  { pages, meta, theme, startPage = 0, withFiller = false, onFlip, onOrientation },
+  { pages, meta, theme, startPage = 0, useMouseEvents = true, onFlip },
   ref,
 ) {
-  const needsFiller = withFiller && pages.length > 1 && pages.length % 2 === 0;
+  const needsFiller = pages.length > 1 && pages.length % 2 === 0;
 
   // Children identity must stay stable across unrelated parent re-renders.
   // react-pageflip clears its collected page refs whenever `children` change
@@ -113,24 +113,20 @@ export const FlipBook = forwardRef<
       maxHeight={760}
       drawShadow
       flippingTime={700}
-      // Narrow viewports get single-page mode — still a real 3D page turn,
-      // just one page at a time, which suits a phone far better than a spread.
-      usePortrait
+      // Always a two-page spread, even on phones — the reader pans across it
+      // instead of collapsing the book to a single page.
+      usePortrait={false}
       startZIndex={0}
       autoSize
       maxShadowOpacity={0.35}
       showCover
       mobileScrollSupport
       clickEventForward
-      useMouseEvents
+      useMouseEvents={useMouseEvents}
       swipeDistance={30}
-      showPageCorners
+      showPageCorners={useMouseEvents}
       disableFlipByClick={false}
       onFlip={(e: { data: number }) => onFlip(e.data)}
-      // onChangeOrientation only fires on later changes, so seed the initial
-      // orientation from onInit's book state.
-      onInit={(e: { data: { mode: FlipOrientation } }) => onOrientation?.(e.data.mode)}
-      onChangeOrientation={(e: { data: FlipOrientation }) => onOrientation?.(e.data)}
     >
       {children}
     </HTMLFlipBook>
