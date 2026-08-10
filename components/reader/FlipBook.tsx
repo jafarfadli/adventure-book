@@ -21,8 +21,8 @@ export type FlipBookHandle = { pageFlip: () => PageFlipApi };
 function gutterClass(index: number): string {
   if (index === 0) return "";
   return index % 2 === 1
-    ? "border-r border-black/10 shadow-[inset_-28px_0_28px_-28px_rgba(0,0,0,0.25)]"
-    : "border-l border-black/10 shadow-[inset_28px_0_28px_-28px_rgba(0,0,0,0.25)]";
+    ? "border-r-2 border-black/20 shadow-[inset_-30px_0_30px_-26px_rgba(0,0,0,0.4)]"
+    : "border-l-2 border-black/20 shadow-[inset_30px_0_30px_-26px_rgba(0,0,0,0.4)]";
 }
 
 // StPageFlip requires each page child to forward its DOM ref.

@@ -196,6 +196,25 @@ export default function BookReader({
         ? pages.length > 1
         : start + 2 < pages.length;
   const visible = pages.slice(start, start + perView);
+  // Narrow-screen camera geometry. A page is deliberately narrower than the
+  // screen: CAM_RIM of pink cover shows on the bound side, CAM_PEEK of the
+  // facing page bleeds off the other edge, so the book always reads as an
+  // open spread continuing past the viewport rather than a lone sheet.
+  // A page is `100vw - CAM_SPAN` wide, so the spread is `200vw - 2*CAM_SPAN`
+  // and shifting it by these offsets lands the wanted page in view.
+  const CAM_RIM = 14;
+  const CAM_PEEK = 40;
+  const CAM_SPAN = CAM_RIM + CAM_PEEK;
+  const camTransform =
+    start === 0
+      ? // closed cover: centre it so pink frames all four sides
+        `translateX(calc(${CAM_SPAN / 2 + CAM_SPAN}px - 100vw))`
+      : half === 0
+        ? // left page: pink rim at the left, facing page bleeds off the right
+          `translateX(${CAM_RIM}px)`
+        : // right page: facing page bleeds off the left, pink rim at the right
+          `translateX(calc(${CAM_PEEK + CAM_SPAN}px - 100vw))`;
+
   const spreadLabel = `hal. ${start + 1}–${start + 2} / ${pages.length}`;
   const label = cameraMode
     ? `hal. ${camIndex + 1} / ${pages.length}`
@@ -270,25 +289,31 @@ export default function BookReader({
           {/* Book cover peeking out around the pages + the paper block edge
               at the bottom. On the cover/closing views the book occupies one
               half only, so the chrome follows the open half. */}
-          <div
-            aria-hidden
-            className={`absolute -top-2.5 -bottom-4 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 ${
-              !cameraMode && start === 0 ? "left-1/2 -right-3" : "-inset-x-3"
-            }`}
-          />
-          <div
-            aria-hidden
-            className={`absolute -bottom-2.5 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] ${
-              !cameraMode && start === 0 ? "left-[51%] right-0" : "inset-x-0"
-            }`}
-          />
-          {cameraMode ? (
-            // Window onto a book that is twice as wide as the screen: the
-            // spread stays intact and slides under the cover frame.
-            <div className="relative overflow-hidden">
+          {!cameraMode && (
+            <>
               <div
-                className="w-[200%] transition-transform duration-[650ms] ease-in-out"
-                style={{ transform: `translateX(${half === 1 ? "-50%" : "0%"})` }}
+                aria-hidden
+                className={`absolute -top-2.5 -bottom-4 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 ${
+                  start === 0 ? "left-1/2 -right-3" : "-inset-x-3"
+                }`}
+              />
+              <div
+                aria-hidden
+                className={`absolute -bottom-2.5 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] ${
+                  start === 0 ? "left-[51%] right-0" : "inset-x-0"
+                }`}
+              />
+            </>
+          )}
+          {cameraMode ? (
+            // Full-bleed window onto a book wider than the screen. The pink
+            // is the cover surface *behind* the paper, so it only shows on
+            // the bound side — the other side is the spread running on past
+            // the viewport.
+            <div className="-mx-4 overflow-hidden bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] py-3.5 shadow-2xl shadow-black/40">
+              <div
+                className="w-[calc(200vw-108px)] transition-transform duration-[650ms] ease-in-out"
+                style={{ transform: camTransform }}
               >
                 <FlipBook
                   key="camera"
