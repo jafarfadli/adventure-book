@@ -47,6 +47,21 @@ model Book {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   pages            Page[]
+  wishlist         WishlistItem[]
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  text      String                              // the activity, text only (no photos)
+  done      Boolean  @default(false)            // checked = struck through
+  doneAt    DateTime?                            // optional: when it was completed
+  order     Int                                 // 0-based ordering within the list
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookId])
 }
 
 model Page {
@@ -94,7 +109,6 @@ enum Layout {
   DUO          // 2 photos side by side + captions
   TRIO         // 3-photo collage
   PHOTO_TEXT   // 1 photo + a longer note beside it
-  DUO_TEXT     // 2 photos + a story
   TEXT         // full-page note / letter
   QUOTE        // centered milestone quote
   CLOSING      // "to be continued" style ending
@@ -118,7 +132,6 @@ export const LAYOUTS: Record<Layout, { label: string; slots: SlotSpec[] }> = {
   DUO:        { label: "Dua foto",      slots: [{ key: "photo1", type: "PHOTO", label: "Foto kiri" }, { key: "photo2", type: "PHOTO", label: "Foto kanan" }] },
   TRIO:       { label: "Kolase tiga",   slots: [{ key: "photo1", type: "PHOTO", label: "Foto 1" }, { key: "photo2", type: "PHOTO", label: "Foto 2" }, { key: "photo3", type: "PHOTO", label: "Foto 3" }] },
   PHOTO_TEXT: { label: "Foto + cerita", slots: [{ key: "photo1", type: "PHOTO", label: "Foto" }, { key: "text1", type: "TEXT", label: "Cerita" }] },
-  DUO_TEXT:   { label: "Dua foto + cerita", slots: [{ key: "photo1", type: "PHOTO", label: "Foto kiri" }, { key: "photo2", type: "PHOTO", label: "Foto kanan" }, { key: "text1", type: "TEXT", label: "Cerita" }] },
   TEXT:       { label: "Surat",         slots: [{ key: "text1", type: "TEXT", label: "Isi surat" }] },
   QUOTE:      { label: "Kutipan",       slots: [{ key: "text1", type: "TEXT", label: "Kutipan" }] },
   CLOSING:    { label: "Penutup",       slots: [{ key: "text1", type: "TEXT", label: "Kata penutup" }] },
@@ -156,6 +169,7 @@ Rate-limit `POST /api/session` (e.g. simple in-memory token bucket per IP, 5 tri
 - `/book/[slug]/unlock` — password form.
 - `/book/[slug]/edit` — editor shell (guarded by `requireEditor`; redirect to `/unlock` if not authorized).
 - `/book/[slug]/map` — **memory map** (see §7.5). Public, read-only. Renders a pin per geotagged photo; ignores photos without coordinates.
+- `/book/[slug]/wishlist` — **shared wishlist** (see §7.6). Public read-only; add/toggle/delete are editor-only.
 
 **Route Handlers**
 - `POST /api/session` — verify password, set cookie.
@@ -167,7 +181,9 @@ Rate-limit `POST /api/session` (e.g. simple in-memory token bucket per IP, 5 tri
 - `createPage(bookId, layout)`, `deletePage(pageId)`, `reorderPages(bookId, orderedIds[])`
 - `setPageLayout(pageId, layout)`
 - `upsertSlot(pageId, key, data)` — write caption/text/imageUrl/rotation/tape/date for a slot
+- `setSlotLocation(slotId, { lat, lng, source, label })`, `clearSlotLocation(slotId)`
 - `updateBookMeta(bookId, { title, subtitle, theme, coverImageUrl })`
+- `addWishlistItem(bookId, text)`, `toggleWishlistItem(id)`, `deleteWishlistItem(id)`, `reorderWishlist(bookId, orderedIds[])`
 
 ---
 
@@ -227,7 +243,7 @@ Tile URL: https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg
 - Respect `prefers-reduced-motion`: skip `flyTo` animations, jump directly.
 - Add a small "🗺️ Peta" entry point from the reader chrome.
 
-**Keys/attribution:** tiles load client-side. Stadia authorizes the `localhost` referer without a key but returns **401 from any other host** — so for the public Funnel host, register a free Stadia account and use a **domain-restricted** API key — safe to expose as `NEXT_PUBLIC_STADIA_API_KEY` since it's locked to your hostname. **Fallback:** when the key is empty, `lib/mapTiles.ts` serves standard OSM tiles (`tile.openstreetmap.org`) instead so the map never breaks — plainer look, same behaviour. Keep attribution controls enabled (it's a licence requirement, not optional chrome).
+**Keys/attribution:** tiles load client-side. Stadia works without a key on localhost and many deployments, but for the public Funnel host, register a free Stadia account and use a **domain-restricted** API key — safe to expose as `NEXT_PUBLIC_STADIA_API_KEY` since it's locked to your hostname. Keep attribution controls enabled (it's a licence requirement, not optional chrome).
 
 **Manual location (editor).** Not every photo has a geotag — screenshots, images sent over WhatsApp (strips EXIF), or shots taken with location services off arrive with no coordinates. So each PHOTO slot in the editor gets a **"📍 Lokasi"** control:
 - If the slot already has `lat`/`lng` (from EXIF or a previous manual set), show it on a small map with the pin, plus a "Ubah" and "Hapus lokasi" action.
@@ -242,6 +258,26 @@ This is also the backfill path for photos uploaded before geotag capture existed
 
 ---
 
+## 7.6 Shared wishlist (`/book/[slug]/wishlist`)
+
+A forward-looking companion to the book: a shared checklist of things the couple wants to do together. Where the book records memories made, the wishlist holds memories to make. Text only — no photos.
+
+**Access model:** public visitors **view** the list read-only (they see each item and whether it's struck through, but checkboxes are disabled). **Editors** (unlocked via password) can add, toggle done/undone, and delete. Same auth as page editing — every mutation goes through a `requireEditor`-guarded Server Action.
+
+**Behaviour:**
+- List of items, each a checkbox + text. Checking an item sets `done = true` and renders the text with a strikethrough; unchecking reverts. Optionally set/clear `doneAt` on toggle to show when it was completed.
+- **Add:** a text input (editor-only) appends a new item to the end (`order = max + 1`). Trim input; ignore empty; cap length (e.g. 200 chars) via zod.
+- **Delete:** editor-only, with a light confirm (or an undo toast).
+- **Reorder:** optional drag handle (editor-only). Not required for v1.
+- Optimistic UI on toggle (flip immediately, reconcile with the action result) so it feels instant.
+- Empty state: a warm prompt like "Belum ada wishlist — tulis hal pertama yang mau kalian lakuin bareng ✨" (editors see the add field; public sees just the message).
+
+**Design:** keep it on-theme — hand-drawn checkboxes, items in the handwritten font (Caveat/Kalam), and a strikethrough that reads like a pen line rather than a hard CSS line-through. Completed items can soften (lower opacity) and optionally show a small `doneAt` date stamp. Add a "✨ Wishlist" entry point in the reader chrome next to the map link.
+
+**Optional extension (not v1):** link a completed item to the book page that documents it (`WishlistItem.pageId?`), so a done wish can say "kelakon! → hal. 7" and jump to that spread — closing the loop between wish and memory.
+
+---
+
 ## 8. Build phases
 
 Ship in order; each phase should be runnable.
@@ -252,7 +288,7 @@ Ship in order; each phase should be runnable.
 - **Phase 3 — Slots + upload.** Per-slot editing driven by `LAYOUTS`: text inputs for TEXT slots, image upload + caption + rotation + date-stamp + tape picker for PHOTO slots. Wire `/api/upload` + sharp. **Extract EXIF GPS with `exifr` at upload and persist `lat`/`lng` onto the slot (§6)** so the map has data later. Live preview mirroring the reader render.
 - **Phase 4 — Polish.** Theme presets, decorative tape/sticker set, empty states, loading/skeletons, error toasts, cover page editing.
 - **Phase 5 — Memory map + manual location.** `/book/[slug]/map` per §7.5: Leaflet + react-leaflet, Stamen Watercolor tiles, polaroid `divIcon` markers, auto-fit with 1/0-marker edge cases, hover-preview, click-to-page. Add the editor's "📍 Lokasi" picker (set / adjust / clear a pin per photo slot) — also the backfill path for older photos with no EXIF. Requires Phase 3. Reader entry point + `?page=` deep-link.
-- **Phase 6 — Nice-to-haves.** 3D page-flip (`react-pageflip` / StPageFlip), marker clustering, optional background-music toggle, timeline/table-of-contents view, export-to-PDF, share sheet.
+- **Phase 6 — Nice-to-haves.** Shared wishlist (§7.6: public read-only, editor add/toggle/delete). 3D page-flip (`react-pageflip` / StPageFlip), marker clustering, optional background-music toggle, export-to-PDF, share sheet.
 
 Do not start a later phase until the earlier one runs end-to-end.
 
@@ -342,10 +378,10 @@ This app is **not** served at the domain root. The Mac mini runs several apps be
 - PostgreSQL via Homebrew; run `prisma migrate deploy` on release.
 - `next build` then run under **PM2**: `PORT=3002 pm2 start npm --name adventure-book -- start`, then `pm2 save`.
 - Confirm nothing else already occupies 3002 — `lsof -i :3002` should be empty before first start.
-- Expose via **Tailscale Funnel** under the `/adventure` path (background mode). Gotcha: `--set-path` **strips** the prefix before proxying, but Next expects it because of `basePath` — so the proxy target must include `/adventure` too:
+- Expose via **Tailscale Funnel** under the `/adventure` path (background mode):
   ```bash
-  tailscale funnel --bg --set-path=/adventure http://127.0.0.1:3002/adventure
-  tailscale funnel status        # verify: /adventure proxy http://127.0.0.1:3002/adventure
+  tailscale funnel --bg --set-path=/adventure localhost:3002
+  tailscale funnel status        # verify the mapping
   ```
   Public URL: `https://jafars-mac-mini.tail9e540f.ts.net/adventure`. Funnel always serves HTTPS, so keep the session cookie `Secure`.
 - `UPLOAD_DIR` lives on local disk outside the build dir; include it in your backup routine (photos are irreplaceable).

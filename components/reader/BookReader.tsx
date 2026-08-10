@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { IconList, IconMapPin, IconPencil, IconShare } from "@/components/ui/icons";
+import { IconMapPin, IconPencil, IconShare, IconSparkle } from "@/components/ui/icons";
 import type { BookData } from "@/lib/types";
 import { getTheme } from "@/lib/themes";
 import { CuteBackdrop } from "./CuteBackdrop";
@@ -11,7 +11,6 @@ import { FlipBook, type FlipBookHandle } from "./FlipBook";
 import { MusicToggle } from "./MusicToggle";
 import { renderLayout } from "./layouts";
 import { PageNav } from "./PageNav";
-import { TocOverlay } from "./TocOverlay";
 
 const SWIPE_THRESHOLD_PX = 48;
 
@@ -36,7 +35,6 @@ export default function BookReader({
   const [half, setHalf] = useState<0 | 1>(1);
   const [start, setStart] = useState(initialPage);
   const [dir, setDir] = useState(1);
-  const [tocOpen, setTocOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const reducedMotion = useReducedMotion();
   const touchX = useRef<number | null>(null);
@@ -136,28 +134,12 @@ export default function BookReader({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setTocOpen(false);
-      if (tocOpen) return;
       if (e.key === "ArrowRight") next();
       if (e.key === "ArrowLeft") prev();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [next, prev, tocOpen]);
-
-  const jumpTo = useCallback(
-    (i: number) => {
-      setTocOpen(false);
-      if (flipMode) {
-        if (cameraMode) setHalf(i === 0 ? 1 : i % 2 === 1 ? 0 : 1);
-        flipRef.current?.pageFlip()?.turnToPage(toFlipIndex(i));
-        return;
-      }
-      setDir(i >= start ? 1 : -1);
-      setStart(isSpread ? i - (i % 2) : i);
-    },
-    [flipMode, cameraMode, isSpread, start, toFlipIndex],
-  );
+  }, [next, prev]);
 
   async function share() {
     const url = window.location.href;
@@ -269,14 +251,13 @@ export default function BookReader({
         >
           <IconMapPin className="h-4 w-4" /> peta
         </Link>
-        <button
-          type="button"
-          onClick={() => setTocOpen(true)}
-          aria-label="Buka daftar isi"
+        <Link
+          href={`/book/${book.slug}/wishlist`}
           className={`inline-flex items-center gap-1.5 font-hand text-lg opacity-50 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
+          aria-label="Buka wishlist"
         >
-          <IconList className="h-4 w-4" /> daftar isi
-        </button>
+          <IconSparkle className="h-4 w-4" /> wishlist
+        </Link>
         <button
           type="button"
           onClick={share}
@@ -426,14 +407,6 @@ export default function BookReader({
       >
         <IconPencil className="h-4 w-4" /> edit
       </Link>
-      {tocOpen && (
-        <TocOverlay
-          pages={pages}
-          currentIndex={start}
-          onJump={jumpTo}
-          onClose={() => setTocOpen(false)}
-        />
-      )}
     </main>
   );
 }
