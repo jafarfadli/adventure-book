@@ -1,0 +1,59 @@
+import type { SlotData } from "@/lib/types";
+
+const TAPE_STYLES: Record<string, string> = {
+  classic: "bg-amber-100/70",
+  pink: "bg-rose-200/70",
+  mint: "bg-emerald-200/60",
+};
+
+export function PolaroidFrame({
+  slot,
+  className = "",
+}: {
+  slot: SlotData;
+  className?: string;
+}) {
+  const alt = slot.caption || "foto kenangan";
+  const tape = slot.tapeStyle ? (TAPE_STYLES[slot.tapeStyle] ?? TAPE_STYLES.classic) : null;
+
+  return (
+    <figure
+      className={`relative w-full max-w-72 bg-white p-3 pb-2 shadow-xl shadow-black/20 ${className}`}
+      style={{ transform: `rotate(${slot.rotation}deg)` }}
+    >
+      {tape && (
+        <span
+          aria-hidden
+          className={`absolute -top-3 left-1/2 h-7 w-24 -translate-x-1/2 -rotate-2 ${tape} shadow-sm backdrop-blur-[1px]`}
+        />
+      )}
+      {slot.imageUrl ? (
+        // Served via /api/media (dynamic, outside /public) — plain <img> on purpose.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={slot.imageUrl}
+          alt={alt}
+          className="aspect-square w-full bg-stone-100 object-cover"
+        />
+      ) : (
+        <div className="flex aspect-square w-full items-center justify-center border-2 border-dashed border-stone-300 bg-stone-50">
+          <span className="font-hand text-xl text-stone-400">belum ada foto</span>
+        </div>
+      )}
+      {(slot.caption || slot.dateLabel) && (
+        <figcaption className="px-1 pt-2 pb-1 text-center">
+          {slot.caption && (
+            <span className="font-hand text-2xl leading-tight text-stone-700">
+              {slot.caption}
+            </span>
+          )}
+          {slot.dateLabel && (
+            <span className="mt-0.5 block font-hand text-lg text-stone-400">
+              {slot.dateLabel}
+            </span>
+          )}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
