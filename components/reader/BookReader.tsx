@@ -8,6 +8,7 @@ import type { BookData } from "@/lib/types";
 import { getTheme } from "@/lib/themes";
 import { CuteBackdrop } from "./CuteBackdrop";
 import { FlipBook, type FlipBookHandle } from "./FlipBook";
+import { MusicToggle } from "./MusicToggle";
 import { renderLayout } from "./layouts";
 import { PageNav } from "./PageNav";
 import { TocOverlay } from "./TocOverlay";
@@ -269,6 +270,7 @@ export default function BookReader({
         onNext={next}
         theme={theme}
       />
+      <MusicToggle className={`fixed bottom-4 left-4 z-30 ${theme.inkSoft}`} />
       <Link
         href={`/book/${book.slug}/unlock`}
         className={`fixed right-4 bottom-4 inline-flex items-center gap-1.5 font-hand text-lg opacity-40 transition hover:opacity-100 focus-visible:opacity-100 ${theme.inkSoft}`}
