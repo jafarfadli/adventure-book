@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { MusicToggle } from "@/components/reader/MusicToggle";
 import { ToastProvider } from "@/components/ui/Toaster";
 import { withBase } from "@/lib/basePath";
 import type { PageData } from "@/lib/types";
@@ -83,6 +84,7 @@ export function EditorShell({
           <AddPageForm bookId={book.id} />
         </section>
       </div>
+      <MusicToggle className="fixed bottom-4 left-4 z-30 text-stone-500" />
       </main>
     </ToastProvider>
   );

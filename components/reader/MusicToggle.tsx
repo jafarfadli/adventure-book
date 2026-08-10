@@ -1,50 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { IconMusic, IconMusicOff } from "@/components/ui/icons";
-import { withBase } from "@/lib/basePath";
+import { isMusicPlaying, subscribeMusic, toggleMusic } from "@/lib/musicPlayer";
 
-const MUSIC_SRC = withBase("/audio/paper-lanterns.mp3");
-const VOLUME = 0.35;
-
-// Background music starts OFF — browsers block autoplay with sound anyway,
-// so playback only ever begins from this user gesture.
+// Controls the shared module-level player, so any instance (reader, map,
+// editor) reflects and drives the same playback. Starts off — browsers only
+// allow sound from a user gesture anyway.
 export function MusicToggle({ className = "" }: { className?: string }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState(false);
-
-  useEffect(() => {
-    return () => {
-      audioRef.current?.pause();
-      audioRef.current = null;
-    };
-  }, []);
-
-  async function toggle() {
-    let audio = audioRef.current;
-    if (!audio) {
-      audio = new Audio(MUSIC_SRC);
-      audio.loop = true;
-      audio.volume = VOLUME;
-      audioRef.current = audio;
-    }
-    if (playing) {
-      audio.pause();
-      setPlaying(false);
-      return;
-    }
-    try {
-      await audio.play();
-      setPlaying(true);
-    } catch {
-      // playback blocked or file unavailable — stay muted
-    }
-  }
+  const playing = useSyncExternalStore(subscribeMusic, isMusicPlaying, () => false);
 
   return (
     <button
       type="button"
-      onClick={toggle}
+      onClick={() => void toggleMusic()}
       aria-pressed={playing}
       aria-label={playing ? "Matikan musik latar" : "Putar musik latar"}
       className={`inline-flex items-center gap-1.5 font-hand text-lg transition focus-visible:opacity-100 ${

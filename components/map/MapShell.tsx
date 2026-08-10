@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { MusicToggle } from "@/components/reader/MusicToggle";
 import type { MapMarkerData } from "./MapView";
 
 // Leaflet is browser-only; skip SSR entirely.
@@ -37,6 +38,7 @@ export function MapShell({
           🗺️ Peta kenangan — {title}
         </h1>
       </div>
+      <MusicToggle className="fixed bottom-4 left-4 z-[500] rounded-full bg-white/90 px-4 py-2 !opacity-100 text-stone-700 shadow-md" />
     </main>
   );
 }
