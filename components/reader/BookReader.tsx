@@ -319,12 +319,6 @@ export default function BookReader({
                   isCoverView ? "opacity-100" : "opacity-0"
                 }`}
               />
-              <div
-                aria-hidden
-                className={`pointer-events-none absolute bottom-[6px] left-[11px] right-[11px] h-2 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] transition-opacity duration-500 ${
-                  isCoverView ? "opacity-100" : "opacity-0"
-                }`}
-              />
               {/* Full-bleed window onto a book wider than the screen. The
                   pink is the cover surface *behind* the paper, so it only
                   shows on the bound side — the other side is the spread
@@ -335,6 +329,17 @@ export default function BookReader({
                   className={`absolute inset-0 bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 transition-opacity duration-500 ${
                     isCoverView ? "opacity-0" : "opacity-100"
                   }`}
+                />
+                {/* Edge of the page block under the open page — it tracks
+                    the paper, so it runs off-screen on the side the spread
+                    continues, exactly like the desktop book. */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute bottom-[2px] h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] transition-all duration-[650ms] ease-in-out"
+                  style={{
+                    left: isCoverView ? CAM_SPAN / 2 : half === 0 ? CAM_RIM : 0,
+                    right: isCoverView ? CAM_SPAN / 2 : half === 0 ? 0 : CAM_RIM,
+                  }}
                 />
                 <div
                   className="relative w-[calc(200vw-108px)] transition-transform duration-[650ms] ease-in-out"
