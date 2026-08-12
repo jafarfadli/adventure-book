@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import { withBase } from "./basePath";
+import { detectFormat, type FrameFormat } from "./frames";
 
 export const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
@@ -25,9 +26,14 @@ export function uploadDir(): string {
  */
 export async function processUpload(
   input: Buffer,
-): Promise<{ imageUrl: string; thumbUrl: string }> {
+): Promise<{ imageUrl: string; thumbUrl: string; aspect: FrameFormat }> {
   const id = randomUUID();
   const dir = uploadDir();
+
+  // Orientation-corrected dimensions, so a portrait phone shot reads as
+  // portrait even when EXIF says the sensor was sideways.
+  const meta = await sharp(input).rotate().toBuffer({ resolveWithObject: true });
+  const aspect = detectFormat(meta.info.width, meta.info.height);
 
   const main = await sharp(input)
     .rotate()
@@ -48,5 +54,6 @@ export async function processUpload(
   return {
     imageUrl: withBase(`/api/media/${id}.webp`),
     thumbUrl: withBase(`/api/media/${id}.thumb.webp`),
+    aspect,
   };
 }

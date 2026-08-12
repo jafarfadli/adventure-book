@@ -59,6 +59,7 @@ model Slot {
   imageUrl  String? // PHOTO: processed image path · VIDEO: poster frame path
   thumbUrl  String? // PHOTO/VIDEO: small thumbnail / poster thumb
   videoUrl  String? // VIDEO: transcoded web-safe MP4 (H.264/AAC) path
+  aspect    String? // PHOTO/VIDEO frame format: "portrait" | "square" | "landscape" (null = square)
   caption   String? // PHOTO: hand-written caption under the photo
   text      String? // TEXT: the note/letter/quote body
   rotation  Float    @default(0) // decorative tilt in degrees (approx -6..6)

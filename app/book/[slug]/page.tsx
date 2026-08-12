@@ -38,6 +38,7 @@ async function fetchBook(slug: string): Promise<BookData | null> {
         imageUrl: slot.imageUrl,
         thumbUrl: slot.thumbUrl,
         videoUrl: slot.videoUrl,
+        aspect: slot.aspect,
         caption: slot.caption,
         text: slot.text,
         rotation: slot.rotation,

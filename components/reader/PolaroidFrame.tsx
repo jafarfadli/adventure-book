@@ -1,29 +1,39 @@
+import { FRAME_RATIO, frameWidth, toFrameFormat } from "@/lib/frames";
 import { TAPE_STYLES } from "@/lib/tapes";
 import type { SlotData } from "@/lib/types";
 
 export function PolaroidFrame({
   slot,
-  className = "max-w-72",
+  size = 288,
+  className = "",
 }: {
   slot: SlotData;
-  /** Must set the frame's max width (e.g. "max-w-44") — no baked-in default,
-   *  so callers' size classes never fight a base max-w utility. */
+  /** Frame height budget in px; the real width follows the slot's format. */
+  size?: number;
+  /** Positioning only — width comes from `size` + format. */
   className?: string;
 }) {
   const alt = slot.caption || "foto kenangan";
+  const format = toFrameFormat(slot.aspect);
   const tape = slot.tapeStyle
     ? (TAPE_STYLES[slot.tapeStyle] ?? TAPE_STYLES.classic).className
     : null;
+  // A polaroid's border is thinner on a small frame; scale it with the width
+  // so a portrait strip doesn't look like it's drowning in white.
+  const pad = format === "portrait" ? "p-2 pb-1.5" : "p-3 pb-2";
 
   return (
     <figure
-      className={`relative w-full bg-white p-3 pb-2 shadow-xl shadow-black/20 ${className}`}
-      style={{ transform: `rotate(${slot.rotation}deg)` }}
+      className={`relative max-w-full bg-white shadow-xl shadow-black/20 ${pad} ${className}`}
+      style={{
+        width: frameWidth(size, format),
+        transform: `rotate(${slot.rotation}deg)`,
+      }}
     >
       {tape && (
         <span
           aria-hidden
-          className={`absolute -top-3 left-1/2 h-7 w-24 -translate-x-1/2 -rotate-2 ${tape} shadow-sm backdrop-blur-[1px]`}
+          className={`absolute -top-3 left-1/2 h-7 w-1/2 -translate-x-1/2 -rotate-2 ${tape} shadow-sm backdrop-blur-[1px]`}
         />
       )}
       {slot.imageUrl ? (
@@ -32,11 +42,15 @@ export function PolaroidFrame({
         <img
           src={slot.imageUrl}
           alt={alt}
-          className="aspect-square w-full bg-stone-100 object-cover"
+          className="w-full bg-stone-100 object-cover"
+          style={{ aspectRatio: FRAME_RATIO[format] }}
         />
       ) : (
-        <div className="flex aspect-square w-full items-center justify-center border-2 border-dashed border-stone-300 bg-stone-50">
-          <span className="font-hand text-xl text-stone-400">belum ada foto</span>
+        <div
+          className="flex w-full items-center justify-center border-2 border-dashed border-stone-300 bg-stone-50"
+          style={{ aspectRatio: FRAME_RATIO[format] }}
+        >
+          <span className="font-hand text-lg text-stone-400">belum ada foto</span>
         </div>
       )}
       {(slot.caption || slot.dateLabel) && (

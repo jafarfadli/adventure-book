@@ -1,20 +1,40 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { FRAME_RATIO, frameWidth, toFrameFormat } from "@/lib/frames";
 import type { SlotData } from "@/lib/types";
 
-// Sprocket holes down both edges of the film border.
-function Sprockets({ side }: { side: "left" | "right" }) {
+// Sprocket holes run down the long edges of the strip: vertically for
+// portrait/square film, along the top and bottom for landscape.
+function Sprockets({
+  side,
+  count,
+  vertical,
+}: {
+  side: "start" | "end";
+  count: number;
+  vertical: boolean;
+}) {
+  const holes = Array.from({ length: count }).map((_, i) => (
+    <span
+      key={i}
+      className={`rounded-[2px] bg-[#f5eddb] ${vertical ? "h-2 w-2.5" : "h-2.5 w-2"}`}
+    />
+  ));
   return (
     <span
       aria-hidden
-      className={`absolute inset-y-2 flex w-4 flex-col items-center justify-between ${
-        side === "left" ? "left-0" : "right-0"
-      }`}
+      className={
+        vertical
+          ? `absolute inset-y-2 flex w-4 flex-col items-center justify-between ${
+              side === "start" ? "left-0" : "right-0"
+            }`
+          : `absolute inset-x-2 flex h-4 items-center justify-between ${
+              side === "start" ? "top-0" : "bottom-0"
+            }`
+      }
     >
-      {Array.from({ length: 7 }).map((_, i) => (
-        <span key={i} className="h-2 w-2.5 rounded-[2px] bg-[#f5eddb]" />
-      ))}
+      {holes}
     </span>
   );
 }
@@ -26,20 +46,31 @@ function Sprockets({ side }: { side: "left" | "right" }) {
  */
 export function FilmFrame({
   slot,
-  className = "max-w-64",
+  size = 256,
+  className = "",
 }: {
   slot: SlotData;
-  /** Must set the frame's max width, like PolaroidFrame. */
+  /** Frame height budget in px; the real width follows the slot's format. */
+  size?: number;
+  /** Positioning only — width comes from `size` + format. */
   className?: string;
 }) {
   const [playing, setPlaying] = useState(false);
   const frameRef = useRef<HTMLElement | null>(null);
   const alt = slot.caption || "video kenangan";
+  const format = toFrameFormat(slot.aspect);
+  // Landscape film runs horizontally, so its sprockets move to top/bottom.
+  const vertical = format !== "landscape";
+  const holes = format === "portrait" ? 9 : format === "square" ? 7 : 8;
 
   // StPageFlip turns pages from native listeners on an ancestor, and those run
   // before React's delegated handlers — so a React onClick here would start
   // playback *and* flip the page. Handle it natively at the target instead,
   // where stopPropagation still gets there first.
+  //
+  // Touches are only held back while the clip is playing, so the controls can
+  // be scrubbed. Before that the frame lets them through: it covers most of
+  // the page, and swallowing them would make the page unswipeable.
   useEffect(() => {
     const el = frameRef.current;
     if (!el) return;
@@ -48,28 +79,36 @@ export function FilmFrame({
       e.stopPropagation();
       if ((e.target as Element | null)?.closest("[data-ab-play]")) setPlaying(true);
     };
+    const mouse = ["mousedown", "mouseup"];
+    const touch = playing ? ["touchstart", "touchend", "touchmove"] : [];
     el.addEventListener("click", onClick);
-    for (const type of ["mousedown", "mouseup", "touchstart", "touchend"]) {
-      el.addEventListener(type, swallow);
-    }
+    for (const type of [...mouse, ...touch]) el.addEventListener(type, swallow);
     return () => {
       el.removeEventListener("click", onClick);
-      for (const type of ["mousedown", "mouseup", "touchstart", "touchend"]) {
-        el.removeEventListener(type, swallow);
-      }
+      for (const type of [...mouse, ...touch]) el.removeEventListener(type, swallow);
     };
-  }, []);
+  }, [playing]);
 
   return (
     <figure
-      className={`relative w-full ${className}`}
-      style={{ transform: `rotate(${slot.rotation}deg)` }}
+      className={`relative max-w-full ${className}`}
+      style={{
+        width: frameWidth(size, format),
+        transform: `rotate(${slot.rotation}deg)`,
+      }}
       ref={frameRef}
     >
-      <div className="relative bg-[#23201c] px-5 py-3 shadow-xl shadow-black/30">
-        <Sprockets side="left" />
-        <Sprockets side="right" />
-        <div className="relative aspect-square w-full overflow-hidden bg-black">
+      <div
+        className={`relative bg-[#23201c] shadow-xl shadow-black/30 ${
+          vertical ? "px-5 py-3" : "px-3 py-5"
+        }`}
+      >
+        <Sprockets side="start" count={holes} vertical={vertical} />
+        <Sprockets side="end" count={holes} vertical={vertical} />
+        <div
+          className="relative w-full overflow-hidden bg-black"
+          style={{ aspectRatio: FRAME_RATIO[format] }}
+        >
           {slot.videoUrl ? (
             playing ? (
               <video

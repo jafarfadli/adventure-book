@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import { FRAME_FORMATS, FRAME_LABELS, toFrameFormat } from "@/lib/frames";
 import type { SlotSpec } from "@/lib/layouts";
 import { TAPE_STYLES } from "@/lib/tapes";
 import type { SlotData } from "@/lib/types";
@@ -29,6 +30,44 @@ const TAPE_OPTIONS = [
     label: `Selotip ${label.toLowerCase()}`,
   })),
 ];
+
+function FormatPicker({
+  value,
+  onChange,
+}: {
+  value: SlotData;
+  onChange: (v: SlotData) => void;
+}) {
+  const current = toFrameFormat(value.aspect);
+  return (
+    <div className="flex flex-col gap-1 text-sm text-stone-600">
+      Format frame
+      <div className="flex gap-2">
+        {FRAME_FORMATS.map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => onChange({ ...value, aspect: f })}
+            aria-pressed={current === f}
+            className={`flex flex-1 flex-col items-center gap-1 rounded-md border px-2 py-2 transition focus-visible:outline-2 ${
+              current === f
+                ? "border-stone-700 bg-white"
+                : "border-stone-300 hover:bg-white/70"
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`rounded-[2px] border-2 ${
+                current === f ? "border-stone-700" : "border-stone-400"
+              } ${f === "portrait" ? "h-6 w-4" : f === "square" ? "h-5 w-5" : "h-4 w-6"}`}
+            />
+            <span className="text-xs">{FRAME_LABELS[f]}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function SlotEditor({
   spec,
@@ -64,8 +103,11 @@ export function SlotEditor({
             imageUrl: value.imageUrl,
             thumbUrl: value.thumbUrl,
           }}
-          onChange={(m) => onChange({ ...value, ...m })}
+          onChange={(m, aspect) =>
+            onChange({ ...value, ...m, aspect: aspect ?? value.aspect })
+          }
         />
+        <FormatPicker value={value} onChange={onChange} />
         <label className="flex flex-col gap-1 text-sm text-stone-600">
           Caption
           <input
@@ -105,15 +147,16 @@ export function SlotEditor({
       <span className="text-sm font-medium text-stone-600">{spec.label}</span>
       <ImageUploader
         value={{ imageUrl: value.imageUrl, thumbUrl: value.thumbUrl }}
-        onChange={(m, gps) => {
-          let next = { ...value, ...m };
+        onChange={(m, meta) => {
+          let next = { ...value, ...m, aspect: meta?.aspect ?? value.aspect };
           // EXIF geotag fills the pin only if no manual pin exists (§7.5).
-          if (gps?.lat != null && gps?.lng != null && value.locationSource !== "manual") {
-            next = { ...next, lat: gps.lat, lng: gps.lng, locationSource: "exif" };
+          if (meta?.lat != null && meta?.lng != null && value.locationSource !== "manual") {
+            next = { ...next, lat: meta.lat, lng: meta.lng, locationSource: "exif" };
           }
           onChange(next);
         }}
       />
+      <FormatPicker value={value} onChange={onChange} />
       <label className="flex flex-col gap-1 text-sm text-stone-600">
         Caption
         <input

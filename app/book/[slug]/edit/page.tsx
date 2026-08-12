@@ -34,6 +34,7 @@ export default async function EditPage({ params }: Props) {
               imageUrl: true,
               thumbUrl: true,
               videoUrl: true,
+              aspect: true,
               caption: true,
               text: true,
               rotation: true,

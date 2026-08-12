@@ -15,7 +15,8 @@ export function VideoUploader({
   onChange,
 }: {
   value: VideoMedia;
-  onChange: (v: VideoMedia) => void;
+  /** aspect is the format detected from a fresh upload, if any. */
+  onChange: (v: VideoMedia, aspect?: string | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const toast = useToast();
@@ -30,14 +31,23 @@ export function VideoUploader({
       fd.append("file", file);
       const res = await fetch(withBase("/api/upload"), { method: "POST", body: fd });
       const data = (await res.json().catch(() => null)) as
-        | { videoUrl?: string; imageUrl?: string; thumbUrl?: string; error?: string }
+        | {
+            videoUrl?: string;
+            imageUrl?: string;
+            thumbUrl?: string;
+            aspect?: string | null;
+            error?: string;
+          }
         | null;
       if (res.ok && data?.videoUrl && data?.imageUrl && data?.thumbUrl) {
-        onChange({
-          videoUrl: data.videoUrl,
-          imageUrl: data.imageUrl,
-          thumbUrl: data.thumbUrl,
-        });
+        onChange(
+          {
+            videoUrl: data.videoUrl,
+            imageUrl: data.imageUrl,
+            thumbUrl: data.thumbUrl,
+          },
+          data.aspect ?? null,
+        );
       } else {
         toast(data?.error ?? "Upload video gagal. Coba lagi, ya.");
       }

@@ -6,6 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import sharp from "sharp";
 import { withBase } from "./basePath";
+import { detectFormat, type FrameFormat } from "./frames";
 import { uploadDir } from "./images";
 
 const run = promisify(execFile);
@@ -26,6 +27,7 @@ export type VideoResult = {
   videoUrl: string;
   imageUrl: string;
   thumbUrl: string;
+  aspect: FrameFormat;
 };
 
 /**
@@ -81,6 +83,10 @@ export async function processVideoUpload(input: Buffer): Promise<VideoResult> {
     }
 
     const [mp4, posterBuf] = await Promise.all([readFile(out), readFile(poster)]);
+    // The poster carries the transcoded clip's dimensions, so one probe
+    // covers both the frame format and the poster images.
+    const posterMeta = await sharp(posterBuf).metadata();
+    const aspect = detectFormat(posterMeta.width ?? 0, posterMeta.height ?? 0);
     const main = await sharp(posterBuf)
       .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
       .webp({ quality: 82 })
@@ -99,6 +105,7 @@ export async function processVideoUpload(input: Buffer): Promise<VideoResult> {
       videoUrl: withBase(`/api/media/${id}.mp4`),
       imageUrl: withBase(`/api/media/${id}.webp`),
       thumbUrl: withBase(`/api/media/${id}.thumb.webp`),
+      aspect,
     };
   } finally {
     await rm(work, { recursive: true, force: true });

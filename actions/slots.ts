@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireEditor } from "@/lib/auth";
 import { MEDIA_PATH_RE, VIDEO_PATH_RE } from "@/lib/basePath";
+import { isFrameFormat } from "@/lib/frames";
 import { prisma } from "@/lib/db";
 import { LAYOUTS } from "@/lib/layouts";
 import { isTapeStyle } from "@/lib/tapes";
@@ -23,6 +24,7 @@ const slotDataSchema = z
     imageUrl: mediaPathSchema.nullish(),
     thumbUrl: mediaPathSchema.nullish(),
     videoUrl: z.string().regex(VIDEO_PATH_RE, "Path video tidak valid").nullish(),
+    aspect: z.string().refine(isFrameFormat, "Format frame tidak dikenal").nullish(),
     rotation: z.number().min(-10).max(10).nullish(),
     tapeStyle: z.string().refine(isTapeStyle, "Gaya selotip tidak dikenal").nullish(),
     dateLabel: z.string().max(60).transform(emptyToNull).nullish(),
@@ -88,6 +90,7 @@ export async function upsertSlot(pageIdRaw: string, keyRaw: string, dataRaw: Slo
           rotation: data.rotation ?? 0,
           tapeStyle: data.tapeStyle ?? null,
           dateLabel: data.dateLabel ?? null,
+          aspect: data.aspect ?? null,
           ...location,
         }
       : spec.type === "VIDEO"
@@ -99,6 +102,7 @@ export async function upsertSlot(pageIdRaw: string, keyRaw: string, dataRaw: Slo
             thumbUrl: data.thumbUrl ?? null,
             rotation: data.rotation ?? 0,
             dateLabel: data.dateLabel ?? null,
+            aspect: data.aspect ?? null,
             ...location,
           }
         : {

@@ -88,6 +88,7 @@ model Slot {
   imageUrl  String?                             // PHOTO: processed image path · VIDEO: poster frame path
   thumbUrl  String?                             // PHOTO/VIDEO: small thumbnail / poster thumb
   videoUrl  String?                             // VIDEO: transcoded web-safe MP4 (H.264/AAC) path
+  aspect    String?                             // PHOTO/VIDEO frame format: "portrait" | "square" | "landscape" (null = square)
   caption   String?                             // PHOTO: hand-written caption under the photo
   text      String?                             // TEXT: the note/letter/quote body
   rotation  Float    @default(0)                // decorative tilt in degrees (approx -6..6)
@@ -245,6 +246,7 @@ The scrapbook feel is the product. Details that matter:
 - **Fonts:** Caveat / Kalam for captions, notes, and date stamps; a clean sans (Inter or similar) only for UI chrome (buttons, editor controls).
 - **Photos:** render as polaroids — white frame, drop shadow, small `rotation` tilt from the slot, optional washi-tape corner via `tapeStyle`. Captions in Caveat under the frame.
 - **Video (film-strip frame):** render VIDEO slots inside a simple "film paper" frame — a dark film border with evenly-spaced sprocket holes down both sides, the video in the middle, a slight tilt to match the polaroids, handwritten caption below. Show the `imageUrl` poster with a play button by default; load/play the `videoUrl` only on interaction (don't autoplay every clip). Use `<video playsInline preload="none" poster={imageUrl}>` — `playsInline` is essential so iOS plays inline instead of hijacking fullscreen. Keep controls minimal; optional muted-loop for very short clips.
+- **Frame formats:** every PHOTO/VIDEO slot picks one of three shapes via `Slot.aspect` — **portrait 2:3**, **square 1:1**, **landscape 3:2** (null reads as square). Defined once in `lib/frames.ts` and shared by both frames and the editor picker. Layouts pass a `size` that is a **height budget, not a width**: each frame multiplies it by its format factor (2/3, 1, 3/2), so every format occupies the same vertical room and swapping a photo's shape can never push a story off a fixed-height page. Uploads pre-select the format from the media's own dimensions (orientation-corrected for photos, from the poster frame for video); the editor can override it. Frame chrome follows the shape too: portrait polaroids get a thinner border, and landscape film strips move their sprocket holes to the top and bottom edges.
 - **Motion:** reader page transition = fade + slight horizontal slide (framer-motion), ~350ms. Respect `prefers-reduced-motion` (cut to instant). Save the 3D page-flip for Phase 5.
 - **Responsive:** mobile-first. On narrow screens, collapse the two-page spread into a single stacked page per view; keep swipe left/right to navigate.
 - **A11y:** every photo slot needs meaningful `alt` (fall back to caption or "foto kenangan"). Keyboard nav (←/→) for pages. Focus-visible states on editor controls.
