@@ -56,8 +56,9 @@ model Slot {
   page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
   key       String // slot id within the layout, e.g. "photo1", "text1"
   type      SlotType
-  imageUrl  String? // PHOTO: processed image path
-  thumbUrl  String? // PHOTO: small thumbnail path
+  imageUrl  String? // PHOTO: processed image path · VIDEO: poster frame path
+  thumbUrl  String? // PHOTO/VIDEO: small thumbnail / poster thumb
+  videoUrl  String? // VIDEO: transcoded web-safe MP4 (H.264/AAC) path
   caption   String? // PHOTO: hand-written caption under the photo
   text      String? // TEXT: the note/letter/quote body
   rotation  Float    @default(0) // decorative tilt in degrees (approx -6..6)
@@ -82,6 +83,7 @@ enum Layout {
   PHOTO_TEXT // 1 photo + a longer note beside it
   DUO_TEXT // 2 photos + a story
   TRIO_TEXT // 3 photos + a story
+  VIDEO // 1 video in a film-strip frame + caption
   TEXT // full-page note / letter
   QUOTE // centered milestone quote
   CLOSING // "to be continued" style ending
@@ -90,4 +92,5 @@ enum Layout {
 enum SlotType {
   PHOTO
   TEXT
+  VIDEO
 }

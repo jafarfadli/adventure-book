@@ -7,6 +7,7 @@ export type SlotData = {
   type: SlotType;
   imageUrl: string | null;
   thumbUrl: string | null;
+  videoUrl: string | null;
   caption: string | null;
   text: string | null;
   rotation: number;

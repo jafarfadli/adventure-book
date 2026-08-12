@@ -1,6 +1,6 @@
 import type { Layout } from "@prisma/client";
 
-export type SlotSpec = { key: string; type: "PHOTO" | "TEXT"; label: string };
+export type SlotSpec = { key: string; type: "PHOTO" | "TEXT" | "VIDEO"; label: string };
 
 // Single source of truth for which slots each layout defines.
 // Both the editor (which slots to render as inputs) and the reader
@@ -54,6 +54,13 @@ export const LAYOUTS: Record<Layout, { label: string; slots: SlotSpec[] }> = {
       { key: "photo2", type: "PHOTO", label: "Foto 2" },
       { key: "photo3", type: "PHOTO", label: "Foto 3" },
       { key: "text1", type: "TEXT", label: "Cerita" },
+    ],
+  },
+  VIDEO: {
+    label: "Video",
+    slots: [
+      { key: "video1", type: "VIDEO", label: "Video" },
+      { key: "text1", type: "TEXT", label: "Caption" },
     ],
   },
   TEXT: {

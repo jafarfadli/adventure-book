@@ -1,5 +1,6 @@
 import type { PageData, SlotData } from "@/lib/types";
 import type { Theme } from "@/lib/themes";
+import { FilmFrame } from "./FilmFrame";
 import { PolaroidFrame } from "./PolaroidFrame";
 
 // One small renderer per Layout value, selected by renderLayout(). The same
@@ -171,6 +172,19 @@ function LayoutTrioText({ slots, theme }: LayoutProps) {
   );
 }
 
+function LayoutVideo({ slots, theme }: LayoutProps) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4">
+      {slots.video1 && <FilmFrame slot={slots.video1} className="max-w-60" />}
+      <TextBlock
+        slot={slots.text1}
+        theme={theme}
+        className="line-clamp-3 max-w-[92%] text-center text-base"
+      />
+    </div>
+  );
+}
+
 function LayoutText({ slots, theme }: LayoutProps) {
   return (
     <div className="flex h-full items-center justify-center">
@@ -214,6 +228,7 @@ const RENDERERS: Record<PageData["layout"], (props: LayoutProps) => React.ReactN
   PHOTO_TEXT: LayoutPhotoText,
   DUO_TEXT: LayoutDuoText,
   TRIO_TEXT: LayoutTrioText,
+  VIDEO: LayoutVideo,
   TEXT: LayoutText,
   QUOTE: LayoutQuote,
   CLOSING: LayoutClosing,

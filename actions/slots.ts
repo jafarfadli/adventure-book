@@ -4,7 +4,7 @@ import { Layout } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireEditor } from "@/lib/auth";
-import { MEDIA_PATH_RE } from "@/lib/basePath";
+import { MEDIA_PATH_RE, VIDEO_PATH_RE } from "@/lib/basePath";
 import { prisma } from "@/lib/db";
 import { LAYOUTS } from "@/lib/layouts";
 import { isTapeStyle } from "@/lib/tapes";
@@ -22,6 +22,7 @@ const slotDataSchema = z
     text: z.string().max(5000).transform(emptyToNull).nullish(),
     imageUrl: mediaPathSchema.nullish(),
     thumbUrl: mediaPathSchema.nullish(),
+    videoUrl: z.string().regex(VIDEO_PATH_RE, "Path video tidak valid").nullish(),
     rotation: z.number().min(-10).max(10).nullish(),
     tapeStyle: z.string().refine(isTapeStyle, "Gaya selotip tidak dikenal").nullish(),
     dateLabel: z.string().max(60).transform(emptyToNull).nullish(),
@@ -89,10 +90,21 @@ export async function upsertSlot(pageIdRaw: string, keyRaw: string, dataRaw: Slo
           dateLabel: data.dateLabel ?? null,
           ...location,
         }
-      : {
-          text: data.text ?? null,
-          rotation: data.rotation ?? 0,
-        };
+      : spec.type === "VIDEO"
+        ? {
+            caption: data.caption ?? null,
+            // For a VIDEO slot imageUrl/thumbUrl hold the poster frame.
+            videoUrl: data.videoUrl ?? null,
+            imageUrl: data.imageUrl ?? null,
+            thumbUrl: data.thumbUrl ?? null,
+            rotation: data.rotation ?? 0,
+            dateLabel: data.dateLabel ?? null,
+            ...location,
+          }
+        : {
+            text: data.text ?? null,
+            rotation: data.rotation ?? 0,
+          };
 
   await prisma.slot.upsert({
     where: { pageId_key: { pageId, key } },

@@ -85,8 +85,9 @@ model Slot {
   page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
   key       String                              // slot id within the layout, e.g. "photo1", "text1"
   type      SlotType
-  imageUrl  String?                             // PHOTO: processed image path
-  thumbUrl  String?                             // PHOTO: small thumbnail path
+  imageUrl  String?                             // PHOTO: processed image path · VIDEO: poster frame path
+  thumbUrl  String?                             // PHOTO/VIDEO: small thumbnail / poster thumb
+  videoUrl  String?                             // VIDEO: transcoded web-safe MP4 (H.264/AAC) path
   caption   String?                             // PHOTO: hand-written caption under the photo
   text      String?                             // TEXT: the note/letter/quote body
   rotation  Float    @default(0)                // decorative tilt in degrees (approx -6..6)
@@ -111,6 +112,7 @@ enum Layout {
   PHOTO_TEXT   // 1 photo + a longer note beside it
   DUO_TEXT     // 2 photos + a story
   TRIO_TEXT    // 3 photos + a story
+  VIDEO        // 1 video in a film-strip frame + caption
   TEXT         // full-page note / letter
   QUOTE        // centered milestone quote
   CLOSING      // "to be continued" style ending
@@ -119,6 +121,7 @@ enum Layout {
 enum SlotType {
   PHOTO
   TEXT
+  VIDEO
 }
 ```
 
@@ -126,7 +129,7 @@ enum SlotType {
 
 ```ts
 // lib/layouts.ts
-export type SlotSpec = { key: string; type: "PHOTO" | "TEXT"; label: string };
+export type SlotSpec = { key: string; type: "PHOTO" | "TEXT" | "VIDEO"; label: string };
 
 export const LAYOUTS: Record<Layout, { label: string; slots: SlotSpec[] }> = {
   COVER:      { label: "Sampul",        slots: [{ key: "photo1", type: "PHOTO", label: "Foto sampul" }, { key: "text1", type: "TEXT", label: "Judul / kutipan" }] },
@@ -136,6 +139,7 @@ export const LAYOUTS: Record<Layout, { label: string; slots: SlotSpec[] }> = {
   PHOTO_TEXT: { label: "Foto + cerita", slots: [{ key: "photo1", type: "PHOTO", label: "Foto" }, { key: "text1", type: "TEXT", label: "Cerita" }] },
   DUO_TEXT:   { label: "Dua foto + cerita", slots: [{ key: "photo1", type: "PHOTO", label: "Foto kiri" }, { key: "photo2", type: "PHOTO", label: "Foto kanan" }, { key: "text1", type: "TEXT", label: "Cerita" }] },
   TRIO_TEXT:  { label: "Tiga foto + cerita", slots: [{ key: "photo1", type: "PHOTO", label: "Foto 1" }, { key: "photo2", type: "PHOTO", label: "Foto 2" }, { key: "photo3", type: "PHOTO", label: "Foto 3" }, { key: "text1", type: "TEXT", label: "Cerita" }] },
+  VIDEO:      { label: "Video",         slots: [{ key: "video1", type: "VIDEO", label: "Video" }, { key: "text1", type: "TEXT", label: "Caption" }] },
   TEXT:       { label: "Surat",         slots: [{ key: "text1", type: "TEXT", label: "Isi surat" }] },
   QUOTE:      { label: "Kutipan",       slots: [{ key: "text1", type: "TEXT", label: "Kutipan" }] },
   CLOSING:    { label: "Penutup",       slots: [{ key: "text1", type: "TEXT", label: "Kata penutup" }] },
@@ -178,8 +182,8 @@ Rate-limit `POST /api/session` (e.g. simple in-memory token bucket per IP, 5 tri
 **Route Handlers**
 - `POST /api/session` — verify password, set cookie.
 - `DELETE /api/session` — clear cookie.
-- `POST /api/upload` — multipart image upload (editor-only). Returns `{ imageUrl, thumbUrl }`.
-- `GET /api/media/[...path]` — streams a stored image from `UPLOAD_DIR` with long-lived cache headers. (Files live outside `/public`, so serve them through here.)
+- `POST /api/upload` — multipart image **or video** upload (editor-only). Images → `{ imageUrl, thumbUrl, lat?, lng? }`; videos → `{ videoUrl, imageUrl (poster), thumbUrl }` (see §6).
+- `GET /api/media/[...path]` — streams a stored file from `UPLOAD_DIR` with long-lived cache headers. (Files live outside `/public`, so serve them through here.) **Must support HTTP range requests** (`Accept-Ranges: bytes`, `206 Partial Content`) — required for video seeking and mobile playback. Serving video as a single full-body response breaks scrubbing and often won't play on iOS.
 
 **Server Actions** (mutations, all call `requireEditor` first)
 - `createPage(bookId, layout)`, `deletePage(pageId)`, `reorderPages(bookId, orderedIds[])`
@@ -206,6 +210,31 @@ In `POST /api/upload`:
 
 Never trust the original filename. Never store absolute disk paths in the DB — store the media route path (e.g. `/api/media/<cuid>.webp`). The `upsertSlot` action writes `lat`/`lng` (and optional `locationLabel`) when the upload returns them.
 
+### Video processing (VIDEO slots)
+
+Video is **not** "a photo that moves" — it needs a different pipeline (`ffmpeg`, not `sharp`) and has real gotchas. Install `ffmpeg` via Homebrew; on the M4 use hardware encoding (`h264_videotoolbox`) for speed.
+
+1. `requireEditor`. Validate mime in `video/mp4|quicktime|webm`, size ≤ ~200MB pre-process (tune to taste). Reject otherwise.
+2. **Extract location first (optional, for the map).** iPhone `.mov` stores GPS in a QuickTime metadata atom. If you want videos to contribute map pins, read it (e.g. `ffprobe`/`exiftool`) before stripping, and persist `lat`/`lng` like photos.
+3. **Transcode to a web-safe MP4** — iPhone video is often HEVC/H.265 in `.mov`, which most browsers can't play. Convert to H.264 + AAC:
+   ```
+   ffmpeg -i input.mov -map_metadata -1 \
+     -c:v h264_videotoolbox -b:v 4M -vf "scale='min(1280,iw)':-2" \
+     -c:a aac -b:a 128k -movflags +faststart output.mp4
+   ```
+   - `-map_metadata -1` strips all metadata (incl. GPS) — required, the book is public.
+   - `-movflags +faststart` moves the index to the front so the video starts playing before it's fully downloaded (streaming).
+   - Cap resolution (e.g. 1280px) and bitrate to keep files reasonable.
+4. **Extract a poster frame** for the film-strip thumbnail (shown before play):
+   ```
+   ffmpeg -i output.mp4 -ss 00:00:01 -frames:v 1 poster.jpg
+   ```
+   Run it through `sharp` to make webp `imageUrl` + `thumbUrl` (reuse the image path fields; for a VIDEO slot, `imageUrl` = poster).
+5. Write `${cuid}.mp4` + poster to `UPLOAD_DIR`. Return `{ videoUrl, imageUrl (poster), thumbUrl, lat?, lng? }`.
+6. **Async caveat:** transcoding a short clip takes seconds to tens of seconds, unlike near-instant image resize. For short clips, blocking the request with a progress indicator is acceptable; for anything longer, run transcode as a background job and poll a status field. Don't leave the editor staring at a frozen spinner with no feedback.
+
+Served video **requires HTTP range support** in `/api/media` (§5) — without it, seeking breaks and iOS often won't play at all.
+
 ---
 
 ## 7. Design direction
@@ -215,6 +244,7 @@ The scrapbook feel is the product. Details that matter:
 - **Paper:** warm cream base (`#efe6d3`-ish), subtle center gutter shadow on the two-page spread. Theme presets keyed by `Book.theme`: `cream`, `dusk` (muted lavender), `kraft` (brown paper). Keep to 2–3 for v1.
 - **Fonts:** Caveat / Kalam for captions, notes, and date stamps; a clean sans (Inter or similar) only for UI chrome (buttons, editor controls).
 - **Photos:** render as polaroids — white frame, drop shadow, small `rotation` tilt from the slot, optional washi-tape corner via `tapeStyle`. Captions in Caveat under the frame.
+- **Video (film-strip frame):** render VIDEO slots inside a simple "film paper" frame — a dark film border with evenly-spaced sprocket holes down both sides, the video in the middle, a slight tilt to match the polaroids, handwritten caption below. Show the `imageUrl` poster with a play button by default; load/play the `videoUrl` only on interaction (don't autoplay every clip). Use `<video playsInline preload="none" poster={imageUrl}>` — `playsInline` is essential so iOS plays inline instead of hijacking fullscreen. Keep controls minimal; optional muted-loop for very short clips.
 - **Motion:** reader page transition = fade + slight horizontal slide (framer-motion), ~350ms. Respect `prefers-reduced-motion` (cut to instant). Save the 3D page-flip for Phase 5.
 - **Responsive:** mobile-first. On narrow screens, collapse the two-page spread into a single stacked page per view; keep swipe left/right to navigate.
 - **A11y:** every photo slot needs meaningful `alt` (fall back to caption or "foto kenangan"). Keyboard nav (←/→) for pages. Focus-visible states on editor controls.
@@ -293,6 +323,7 @@ Ship in order; each phase should be runnable.
 - **Phase 4 — Polish.** Theme presets, decorative tape/sticker set, empty states, loading/skeletons, error toasts, cover page editing.
 - **Phase 5 — Memory map + manual location.** `/book/[slug]/map` per §7.5: Leaflet + react-leaflet, Stamen Watercolor tiles, polaroid `divIcon` markers, auto-fit with 1/0-marker edge cases, hover-preview, click-to-page. Add the editor's "📍 Lokasi" picker (set / adjust / clear a pin per photo slot) — also the backfill path for older photos with no EXIF. Requires Phase 3. Reader entry point + `?page=` deep-link.
 - **Phase 6 — Nice-to-haves.** Shared wishlist (§7.6: public read-only, editor add/toggle/delete). 3D page-flip (`react-pageflip` / StPageFlip), marker clustering, optional background-music toggle, export-to-PDF, share sheet.
+- **Phase 7 — Video layout.** Add `VIDEO` layout + slot type. Extend `/api/upload` for video: `ffmpeg` transcode to web-safe MP4 (`h264_videotoolbox`, `+faststart`), metadata strip, poster-frame extraction (§6 Video processing). Add HTTP range support to `/api/media` (§5). Film-strip frame renderer in reader + editor preview (§7). Requires the editor/upload flow (Phase 3) and the range-capable media route.
 
 Do not start a later phase until the earlier one runs end-to-end.
 

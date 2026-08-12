@@ -19,12 +19,13 @@ const inputCls =
 const PAGE_W = 460;
 const PAGE_H = 620;
 
-function emptySlot(key: string, type: "PHOTO" | "TEXT"): SlotData {
+function emptySlot(key: string, type: SlotData["type"]): SlotData {
   return {
     key,
     type,
     imageUrl: null,
     thumbUrl: null,
+    videoUrl: null,
     caption: null,
     text: null,
     rotation: 0,
@@ -114,6 +115,7 @@ export function PageEditor({
             text: s.text,
             imageUrl: s.imageUrl,
             thumbUrl: s.thumbUrl,
+            videoUrl: s.videoUrl,
             rotation: s.rotation,
             tapeStyle: s.tapeStyle,
             dateLabel: s.dateLabel,

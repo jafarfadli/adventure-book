@@ -6,6 +6,7 @@ import type { SlotSpec } from "@/lib/layouts";
 import { TAPE_STYLES } from "@/lib/tapes";
 import type { SlotData } from "@/lib/types";
 import { ImageUploader } from "./ImageUploader";
+import { VideoUploader } from "./VideoUploader";
 
 // Leaflet touches `window` at import time — client-only, no SSR.
 const LocationPicker = dynamic(() => import("./LocationPicker"), {
@@ -49,6 +50,52 @@ export function SlotEditor({
           maxLength={5000}
           className={`${inputCls} resize-y font-hand-alt`}
         />
+      </div>
+    );
+  }
+
+  if (spec.type === "VIDEO") {
+    return (
+      <div className="flex flex-col gap-3">
+        <span className="text-sm font-medium text-stone-600">{spec.label}</span>
+        <VideoUploader
+          value={{
+            videoUrl: value.videoUrl,
+            imageUrl: value.imageUrl,
+            thumbUrl: value.thumbUrl,
+          }}
+          onChange={(m) => onChange({ ...value, ...m })}
+        />
+        <label className="flex flex-col gap-1 text-sm text-stone-600">
+          Caption
+          <input
+            value={value.caption ?? ""}
+            onChange={(e) => onChange({ ...value, caption: e.target.value })}
+            maxLength={300}
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-stone-600">
+          Tanggal (mis. 14 Feb 2025)
+          <input
+            value={value.dateLabel ?? ""}
+            onChange={(e) => onChange({ ...value, dateLabel: e.target.value })}
+            maxLength={60}
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-stone-600">
+          Kemiringan ({value.rotation.toFixed(0)}°)
+          <input
+            type="range"
+            min={-6}
+            max={6}
+            step={1}
+            value={value.rotation}
+            onChange={(e) => onChange({ ...value, rotation: Number(e.target.value) })}
+          />
+        </label>
+        <LocationControl value={value} onChange={onChange} />
       </div>
     );
   }
