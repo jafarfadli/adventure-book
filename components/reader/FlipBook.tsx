@@ -5,6 +5,7 @@ import HTMLFlipBook from "react-pageflip";
 import type { Theme } from "@/lib/themes";
 import type { PageData } from "@/lib/types";
 import { renderLayout, type BookMeta } from "./layouts";
+import { PageCanvas } from "./PageCanvas";
 
 export type PageFlipApi = {
   flipNext: () => void;
@@ -34,13 +35,9 @@ const FlipPage = forwardRef<
     page.layout === "COVER" ? "bg-[#ff97d0]" : `paper-texture ${theme.paper}`;
   return (
     <div ref={ref} className={`h-full w-full ${surface}`}>
-      {/* Padding is a container query, not a viewport one, so the editor
-          preview reproduces this page exactly at the same width. */}
-      <div className={`@container h-full w-full overflow-hidden ${gutterClass(index)}`}>
-        <div className="h-full w-full p-5 @md:p-8">
-          {renderLayout(page, meta, theme)}
-        </div>
-      </div>
+      <PageCanvas className={`h-full w-full ${gutterClass(index)}`}>
+        <div className="h-full w-full p-8">{renderLayout(page, meta, theme)}</div>
+      </PageCanvas>
     </div>
   );
 });

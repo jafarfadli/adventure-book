@@ -1,9 +1,10 @@
 "use client";
 
 import { Layout } from "@prisma/client";
-import { useEffect, useRef, useState, useTransition } from "react";
-import { setPageLayout, upsertSlot } from "@/actions/slots";
+import { useEffect, useState, useTransition } from "react";
+import { setPageLayout } from "@/actions/slots";
 import { renderLayout, type BookMeta } from "@/components/reader/layouts";
+import { PageCanvas, PAGE_H, PAGE_W } from "@/components/reader/PageCanvas";
 import { useToast } from "@/components/ui/Toaster";
 import { LAYOUTS } from "@/lib/layouts";
 import { getTheme } from "@/lib/themes";
@@ -13,11 +14,6 @@ import { SlotEditor } from "./SlotEditor";
 const inputCls =
   "rounded-md border border-stone-300 bg-white px-3 py-2 text-base text-stone-800 " +
   "focus-visible:outline-2 focus-visible:outline-offset-1";
-
-// The reader's declared page size (see FlipBook). The preview draws a page
-// at exactly this size and scales it to fit the column.
-const PAGE_W = 460;
-const PAGE_H = 620;
 
 function emptySlot(key: string, type: SlotData["type"]): SlotData {
   return {
@@ -56,30 +52,31 @@ export function PageEditor({
   page,
   bookMeta,
   themeKey,
+  draft,
+  onDraftChange,
 }: {
   page: PageData;
   bookMeta: BookMeta;
   themeKey: string;
+  /** Kept by the shell so edits survive collapsing the page. */
+  draft?: Record<string, SlotData>;
+  onDraftChange: (pageId: string, slots: Record<string, SlotData>) => void;
 }) {
-  const [slots, setSlots] = useState(() => slotsFromPage(page));
-  const [saved, setSaved] = useState(false);
+  const [slots, setSlots] = useState(() => draft ?? slotsFromPage(page));
   const [pending, startTransition] = useTransition();
   const toast = useToast();
 
-  const previewRef = useRef<HTMLDivElement>(null);
-  const [previewScale, setPreviewScale] = useState(0);
+  // Adopt fresh server state after layout switches, unless the shell is
+  // already holding unsaved edits for this page.
   useEffect(() => {
-    const el = previewRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) =>
-      setPreviewScale(entry.contentRect.width / PAGE_W),
-    );
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    if (!draft) setSlots(slotsFromPage(page));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
-  // Adopt fresh server state after saves / layout switches.
-  useEffect(() => setSlots(slotsFromPage(page)), [page]);
+  function update(next: Record<string, SlotData>) {
+    setSlots(next);
+    onDraftChange(page.id, next);
+  }
 
   const theme = getTheme(themeKey);
   const specs = LAYOUTS[page.layout].slots;
@@ -101,35 +98,6 @@ export function PageEditor({
         await setPageLayout(page.id, next);
       } catch {
         toast("Gagal mengganti layout. Coba lagi, ya.");
-      }
-    });
-  }
-
-  function onSave() {
-    setSaved(false);
-    startTransition(async () => {
-      try {
-        for (const spec of specs) {
-          const s = slots[spec.key];
-          await upsertSlot(page.id, spec.key, {
-            caption: s.caption,
-            text: s.text,
-            imageUrl: s.imageUrl,
-            thumbUrl: s.thumbUrl,
-            videoUrl: s.videoUrl,
-            aspect: s.aspect,
-            rotation: s.rotation,
-            tapeStyle: s.tapeStyle,
-            dateLabel: s.dateLabel,
-            lat: s.lat,
-            lng: s.lng,
-            locationLabel: s.locationLabel,
-            locationSource: s.locationSource as "exif" | "manual" | null,
-          });
-        }
-        setSaved(true);
-      } catch {
-        toast("Gagal menyimpan halaman. Coba lagi, ya.");
       }
     });
   }
@@ -161,52 +129,27 @@ export function PageEditor({
               key={`${page.layout}-${spec.key}`}
               spec={spec}
               value={slots[spec.key] ?? emptySlot(spec.key, spec.type)}
-              onChange={(v) => setSlots((prev) => ({ ...prev, [spec.key]: v }))}
+              onChange={(v) => update({ ...slots, [spec.key]: v })}
             />
           ))}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={pending}
-              className="rounded-md bg-stone-800 px-4 py-2 text-sm text-white transition hover:bg-stone-700 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2"
-            >
-              {pending ? "Menyimpan…" : "Simpan halaman"}
-            </button>
-            {saved && <span className="text-sm text-emerald-700">Tersimpan ✓</span>}
-          </div>
         </div>
 
         <div className="flex flex-col gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">
             Pratinjau
           </span>
-          {/* Renders a full-size page and scales it down, rather than
-              rendering a small page: the layouts size photos in absolute
-              units, so only an exact scale keeps the composition identical
-              to what the reader shows. */}
-          <div
-            ref={previewRef}
-            className="relative w-full overflow-hidden rounded-md shadow-inner"
+          {/* Exactly the reader's page box, so the preview is the real
+              composition at a smaller zoom. */}
+          <PageCanvas
+            className={`rounded-md shadow-inner ${
+              page.layout === "COVER" ? "bg-[#ff97d0]" : `paper-texture ${theme.paper}`
+            }`}
             style={{ aspectRatio: `${PAGE_W} / ${PAGE_H}` }}
           >
-            <div
-              className={`@container absolute top-0 left-0 origin-top-left ${
-                page.layout === "COVER"
-                  ? "bg-[#ff97d0]"
-                  : `paper-texture ${theme.paper}`
-              }`}
-              style={{
-                width: PAGE_W,
-                height: PAGE_H,
-                transform: `scale(${previewScale})`,
-              }}
-            >
-              <div className="h-full w-full p-5 @md:p-8">
-                {renderLayout(previewPage, bookMeta, theme)}
-              </div>
+            <div className="h-full w-full p-8">
+              {renderLayout(previewPage, bookMeta, theme)}
             </div>
-          </div>
+          </PageCanvas>
         </div>
       </div>
     </div>

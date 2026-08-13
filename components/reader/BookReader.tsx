@@ -10,6 +10,7 @@ import { CuteBackdrop } from "./CuteBackdrop";
 import { FlipBook, type FlipBookHandle } from "./FlipBook";
 import { MusicToggle } from "./MusicToggle";
 import { renderLayout } from "./layouts";
+import { PageCanvas } from "./PageCanvas";
 import { PageNav } from "./PageNav";
 
 const SWIPE_THRESHOLD_PX = 48;
@@ -269,7 +270,19 @@ export default function BookReader({
       </div>
 
       {flipMode ? (
-        <div className="relative w-full max-w-4xl">
+        // The book used to just appear, which read as stiff. It now settles
+        // in: tilted slightly back and small, easing upright as it lands.
+        <motion.div
+          className="relative w-full max-w-4xl"
+          initial={
+            reducedMotion
+              ? false
+              : { opacity: 0, scale: 0.9, rotateX: 12, y: 26 }
+          }
+          animate={{ opacity: 1, scale: 1, rotateX: 0, y: 0 }}
+          transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+          style={{ transformPerspective: 1400 }}
+        >
           {/* Book cover peeking out around the pages + the paper block edge
               at the bottom. On the cover/closing views the book occupies one
               half only, so the chrome follows the open half. */}
@@ -349,7 +362,7 @@ export default function BookReader({
               onFlip={setStart}
             />
           )}
-        </div>
+        </motion.div>
       ) : (
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -374,15 +387,17 @@ export default function BookReader({
                 <section
                   key={page.id}
                   aria-label={`Halaman ${page.order + 1}`}
-                  className={`@container relative min-h-[70dvh] ${
+                  className={`relative ${
                     page.layout === "COVER"
                       ? "bg-[#ff97d0]"
                       : `paper-texture ${theme.paper}`
                   } ${isSpread ? (i === 0 ? gutterLeft : gutterRight) : ""}`}
                 >
-                  <div className="h-full w-full p-5 @md:p-8">
-                    {renderLayout(page, meta, theme)}
-                  </div>
+                  <PageCanvas className="h-full min-h-[70dvh] w-full">
+                    <div className="h-full w-full p-8">
+                      {renderLayout(page, meta, theme)}
+                    </div>
+                  </PageCanvas>
                 </section>
               ))}
               {isSpread && visible.length === 1 && (

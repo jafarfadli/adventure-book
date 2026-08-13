@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { CuteBackdrop } from "@/components/reader/CuteBackdrop";
 import { WishlistView, type WishItem } from "@/components/wishlist/WishlistView";
+import { getEditorBookId } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getTheme } from "@/lib/themes";
 
@@ -20,10 +21,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     select: { title: true },
   });
   if (!book) return {};
-  return { title: `Wishlist — ${book.title}` };
+  return { title: `Edit wishlist — ${book.title}` };
 }
 
-export default async function WishlistPage({ params }: Props) {
+export default async function WishlistEditPage({ params }: Props) {
   const { slug } = await params;
 
   const book = await prisma.book.findUnique({
@@ -39,7 +40,8 @@ export default async function WishlistPage({ params }: Props) {
   });
   if (!book) notFound();
 
-  // Read-only view; editing lives on its own route, like the book.
+  // Same guard as page editing: no session, no edit screen.
+  if ((await getEditorBookId()) !== book.id) redirect(`/book/${slug}/unlock`);
   const theme = getTheme(book.theme);
 
   const items: WishItem[] = book.wishlist.map((i) => ({
@@ -59,7 +61,7 @@ export default async function WishlistPage({ params }: Props) {
           bookId={book.id}
           slug={slug}
           items={items}
-          canEdit={false}
+          canEdit
           theme={theme}
         />
       </div>

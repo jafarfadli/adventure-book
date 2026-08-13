@@ -6,7 +6,7 @@ import { deletePage, reorderPages } from "@/actions/pages";
 import type { BookMeta } from "@/components/reader/layouts";
 import { useToast } from "@/components/ui/Toaster";
 import { LAYOUTS } from "@/lib/layouts";
-import type { PageData } from "@/lib/types";
+import type { PageData, SlotData } from "@/lib/types";
 import { PageEditor } from "./PageEditor";
 
 function PageListItem({
@@ -84,11 +84,15 @@ export function PageList({
   pages,
   bookMeta,
   themeKey,
+  drafts,
+  onDraftChange,
 }: {
   bookId: string;
   pages: PageData[];
   bookMeta: BookMeta;
   themeKey: string;
+  drafts: Record<string, Record<string, SlotData>>;
+  onDraftChange: (pageId: string, slots: Record<string, SlotData>) => void;
 }) {
   const [items, setItems] = useState(pages);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -150,7 +154,13 @@ export function PageList({
           onDelete={() => onDelete(page)}
           onDragEnd={commitOrder}
         >
-          <PageEditor page={page} bookMeta={bookMeta} themeKey={themeKey} />
+          <PageEditor
+                  page={page}
+                  bookMeta={bookMeta}
+                  themeKey={themeKey}
+                  draft={drafts[page.id]}
+                  onDraftChange={onDraftChange}
+                />
         </PageListItem>
       ))}
     </Reorder.Group>
