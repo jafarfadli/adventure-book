@@ -302,7 +302,7 @@ export default function BookReader({
               <div
                 aria-hidden
                 className={`absolute -top-2.5 -bottom-4 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] transition-[left,right] ease-out ${
-                  shut ? "left-1/2 -right-3 duration-0" : "-inset-x-3 duration-[450ms]"
+                  shut ? "left-1/2 -right-3 duration-0" : "-inset-x-3 delay-[340ms] duration-[380ms]"
                 }`}
               />
               <div
@@ -310,13 +310,13 @@ export default function BookReader({
                 className={`absolute -top-2.5 -bottom-4 rounded-md shadow-2xl shadow-black/40 transition-[left,right,opacity] ease-out ${
                   shut
                     ? "left-1/2 -right-3 opacity-100 duration-0"
-                    : "-inset-x-3 opacity-100 delay-150 duration-[600ms]"
+                    : "-inset-x-3 opacity-100 delay-[400ms] duration-[420ms]"
                 }`}
               />
               <div
                 aria-hidden
                 className={`absolute -bottom-2.5 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] transition-[left,right] ease-out ${
-                  shut ? "left-[51%] right-0 duration-0" : "inset-x-0 duration-[450ms]"
+                  shut ? "left-[51%] right-0 duration-0" : "inset-x-0 delay-[340ms] duration-[380ms]"
                 }`}
               />
             </>
@@ -329,7 +329,7 @@ export default function BookReader({
               <div
                 aria-hidden
                 className={`pointer-events-none absolute inset-x-0 -top-px bottom-0 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 transition-opacity ${
-                  isCoverView ? "opacity-100 duration-0" : "opacity-0 duration-200"
+                  isCoverView ? "opacity-100 duration-0" : "opacity-0 delay-[340ms] duration-200"
                 }`}
               />
               {/* Full-bleed window onto a book wider than the screen. The
@@ -340,7 +340,7 @@ export default function BookReader({
                 <div
                   aria-hidden
                   className={`absolute inset-0 bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] transition-opacity ${
-                    isCoverView ? "opacity-0 duration-0" : "opacity-100 duration-200"
+                    isCoverView ? "opacity-0 duration-0" : "opacity-100 delay-[340ms] duration-200"
                   }`}
                 />
                 <div
@@ -355,7 +355,7 @@ export default function BookReader({
                   <div
                     aria-hidden
                     className={`pointer-events-none absolute -bottom-3 right-0 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] transition-[left] ease-out ${
-                      isCoverView ? "duration-0" : "duration-[450ms]"
+                      isCoverView ? "duration-0" : "delay-[340ms] duration-[380ms]"
                     }`}
                     style={{ left: isCoverView ? "calc(100vw - 54px)" : 0 }}
                   />
@@ -366,7 +366,6 @@ export default function BookReader({
                     meta={meta}
                     theme={theme}
                     startPage={flipInitial}
-                    useMouseEvents={false}
                     onFlip={(p) => {
                       setStart(p);
                       setShut(p === 0);
@@ -376,18 +375,30 @@ export default function BookReader({
               </div>
             </>
           ) : (
-            <FlipBook
-              key="full"
-              ref={flipRef}
-              pages={pages}
-              meta={meta}
-              theme={theme}
-              startPage={flipInitial}
-              onFlip={(p) => {
-                setStart(p);
-                setShut(p === 0);
+            // Turning by clicking a half replaces StPageFlip's own click and
+            // drag, so every turn runs through next/prev and the cover chrome
+            // stays in step. Interactive page content (a video frame) stops
+            // the click before it reaches here.
+            <div
+              onClick={(e) => {
+                const box = e.currentTarget.getBoundingClientRect();
+                if (e.clientX < box.left + box.width / 2) prev();
+                else next();
               }}
-            />
+            >
+              <FlipBook
+                key="full"
+                ref={flipRef}
+                pages={pages}
+                meta={meta}
+                theme={theme}
+                startPage={flipInitial}
+                onFlip={(p) => {
+                  setStart(p);
+                  setShut(p === 0);
+                }}
+              />
+            </div>
           )}
         </motion.div>
       ) : (

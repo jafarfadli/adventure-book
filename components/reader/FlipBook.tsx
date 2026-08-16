@@ -65,18 +65,9 @@ export const FlipBook = forwardRef<
     meta: BookMeta;
     theme: Theme;
     startPage?: number;
-    /**
-     * Off when the reader pans a narrow viewport across the spread itself —
-     * StPageFlip's own drag would fight those swipes. Read once at init, so
-     * the reader remounts this component when the mode changes.
-     */
-    useMouseEvents?: boolean;
     onFlip: (pageIndex: number) => void;
   }
->(function FlipBook(
-  { pages, meta, theme, startPage = 0, useMouseEvents = true, onFlip },
-  ref,
-) {
+>(function FlipBook({ pages, meta, theme, startPage = 0, onFlip }, ref) {
   const needsFiller = pages.length > 1 && pages.length % 2 === 0;
 
   // Children identity must stay stable across unrelated parent re-renders.
@@ -121,10 +112,14 @@ export const FlipBook = forwardRef<
       showCover
       mobileScrollSupport
       clickEventForward
-      useMouseEvents={useMouseEvents}
+      // The reader drives every turn itself (click halves on desktop, swipe on
+      // mobile). StPageFlip's own click and drag bypass that, reporting only
+      // when the animation ends — which left the cover chrome out of step and
+      // let a half-finished drag strand the book mid-turn.
+      useMouseEvents={false}
       swipeDistance={30}
-      showPageCorners={useMouseEvents}
-      disableFlipByClick={false}
+      showPageCorners={false}
+      disableFlipByClick
       onFlip={(e: { data: number }) => onFlip(e.data)}
     >
       {children}
