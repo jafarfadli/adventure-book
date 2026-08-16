@@ -415,11 +415,20 @@ This app is **not** served at the domain root. The Mac mini runs several apps be
 - PostgreSQL via Homebrew; run `prisma migrate deploy` on release.
 - `next build` then run under **PM2**: `PORT=3002 pm2 start npm --name adventure-book -- start`, then `pm2 save`.
 - Confirm nothing else already occupies 3002 — `lsof -i :3002` should be empty before first start.
-- Expose via **Tailscale Funnel** under the `/adventure` path (background mode). Gotcha: `--set-path` **strips** the prefix before proxying, but Next expects it because of `basePath` — so the proxy target must include `/adventure` too:
+- **Exposed via a shared Caddy gateway, not a direct Funnel path mount.** `tailscale funnel --set-path` strips the prefix before proxying, which breaks any app expecting basePath intact — so instead, Funnel forwards *everything* on `:443` to a local Caddy instance on `:8080`, and Caddy does the per-app path routing with the request URI untouched:
   ```bash
-  tailscale funnel --bg --set-path=/adventure http://127.0.0.1:3002/adventure
-  tailscale funnel status        # verify: /adventure proxy http://127.0.0.1:3002/adventure
+  tailscale funnel --bg 8080          # once, covers every app on the host
+  tailscale funnel status             # verify: / proxy http://127.0.0.1:8080
   ```
+  Caddy config lives outside this repo at `~/Koding/_gateway/Caddyfile` (shared across apps on the Mac mini):
+  ```caddyfile
+  @adventure path /adventure /adventure/*
+  handle @adventure {
+      reverse_proxy 127.0.0.1:3002
+  }
+  ```
+  Adding a new app on this host: give it a port, set its `basePath` to match, add one matcher+handle pair here, `caddy reload`. Don't add another direct `tailscale funnel --set-path` mount — it'll fight the gateway for the same paths.
   Public URL: `https://jafars-mac-mini.tail9e540f.ts.net/adventure`. Funnel always serves HTTPS, so keep the session cookie `Secure`.
+  **Boot persistence:** as of this writing neither Caddy nor PM2 is registered with `launchd` — both are running as plain background processes started by hand. A reboot of the Mac mini currently loses the whole stack (`tailscale funnel` itself does persist). Fix: `pm2 startup` (prints a `sudo` command to run once) + `pm2 save`, and give Caddy a LaunchAgent/LaunchDaemon plist running `caddy run --config ~/Koding/_gateway/Caddyfile`.
 - `UPLOAD_DIR` lives on local disk outside the build dir; include it in your backup routine (photos are irreplaceable).
 - Set `NODE_ENV=production`; confirm `next.config` allows serving images through the media route (they're not in `/public`).
