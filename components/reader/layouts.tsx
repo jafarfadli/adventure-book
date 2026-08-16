@@ -1,4 +1,5 @@
 import type { PageData, SlotData } from "@/lib/types";
+import { FRAME_SIZE } from "@/lib/frames";
 import type { Theme } from "@/lib/themes";
 import { FilmFrame } from "./FilmFrame";
 import { PolaroidFrame } from "./PolaroidFrame";
@@ -10,9 +11,11 @@ import { PolaroidFrame } from "./PolaroidFrame";
 // frames and stagger them left/right with slight overlaps, scrapbook style,
 // and long text is line-clamped so nothing overflows the paper.
 //
-// `size` is a height budget, not a width: each frame converts it using its
-// own format (portrait 2:3 / square / landscape 3:2), so switching a photo's
-// format never changes how much vertical room it takes.
+// `size` is an *optical* size from the FRAME_SIZE scale — every format covers
+// the same area, so a portrait photo carries the same weight as a landscape
+// one. Because portrait is the tallest shape, each layout also passes the
+// height ceiling its stack can afford (`maxHeight`); frames shrink along
+// their own ratio when it bites, so nothing ever overruns the page.
 
 export type BookMeta = { title: string; subtitle: string | null };
 type LayoutProps = { slots: Record<string, SlotData>; book: BookMeta; theme: Theme };
@@ -65,7 +68,7 @@ function LayoutCover({ slots, book }: LayoutProps) {
       {book.subtitle && (
         <p className="font-hand-alt text-xl text-white/90">{book.subtitle}</p>
       )}
-      {slots.photo1 && <PolaroidFrame slot={slots.photo1} size={208} />}
+      {slots.photo1 && <PolaroidFrame slot={slots.photo1} size={FRAME_SIZE.cover} maxHeight={236} />}
       {slots.text1?.text && (
         <p className="font-hand text-2xl text-white/90">{slots.text1.text}</p>
       )}
@@ -76,7 +79,7 @@ function LayoutCover({ slots, book }: LayoutProps) {
 function LayoutSingle({ slots }: LayoutProps) {
   return (
     <div className="flex h-full items-center justify-center">
-      {slots.photo1 && <PolaroidFrame slot={slots.photo1} size={248} />}
+      {slots.photo1 && <PolaroidFrame slot={slots.photo1} size={FRAME_SIZE.hero} maxHeight={430} />}
     </div>
   );
 }
@@ -85,13 +88,19 @@ function LayoutDuo({ slots }: LayoutProps) {
   return (
     <div className="flex h-full flex-col justify-center">
       {slots.photo1 && (
-        <PolaroidFrame slot={slots.photo1} size={176} className="ml-[6%] self-start" />
+        <PolaroidFrame
+          slot={slots.photo1}
+          size={FRAME_SIZE.pair}
+          maxHeight={232}
+          className="ml-[6%] self-start"
+        />
       )}
       {slots.photo2 && (
         <PolaroidFrame
           slot={slots.photo2}
-          size={176}
-          className="-mt-6 mr-[6%] self-end"
+          size={FRAME_SIZE.pair}
+          maxHeight={232}
+          className="-mt-10 mr-[6%] self-end"
         />
       )}
     </div>
@@ -102,17 +111,28 @@ function LayoutTrio({ slots }: LayoutProps) {
   return (
     <div className="flex h-full flex-col justify-center">
       {slots.photo1 && (
-        <PolaroidFrame slot={slots.photo1} size={144} className="ml-[4%] self-start" />
+        <PolaroidFrame
+          slot={slots.photo1}
+          size={FRAME_SIZE.trio}
+          maxHeight={172}
+          className="ml-[4%] self-start"
+        />
       )}
       {slots.photo2 && (
         <PolaroidFrame
           slot={slots.photo2}
-          size={144}
-          className="-mt-6 mr-[4%] self-end"
+          size={FRAME_SIZE.trio}
+          maxHeight={172}
+          className="-mt-14 mr-[4%] self-end"
         />
       )}
       {slots.photo3 && (
-        <PolaroidFrame slot={slots.photo3} size={144} className="-mt-5 self-center" />
+        <PolaroidFrame
+          slot={slots.photo3}
+          size={FRAME_SIZE.trio}
+          maxHeight={172}
+          className="-mt-14 self-center"
+        />
       )}
     </div>
   );
@@ -122,7 +142,12 @@ function LayoutPhotoText({ slots, theme }: LayoutProps) {
   return (
     <div className="flex h-full flex-col justify-center gap-4">
       {slots.photo1 && (
-        <PolaroidFrame slot={slots.photo1} size={192} className="ml-[5%] self-start" />
+        <PolaroidFrame
+          slot={slots.photo1}
+          size={FRAME_SIZE.pair}
+          maxHeight={300}
+          className="ml-[5%] self-start"
+        />
       )}
       <TextBlock
         slot={slots.text1}
@@ -137,13 +162,19 @@ function LayoutDuoText({ slots, theme }: LayoutProps) {
   return (
     <div className="flex h-full flex-col justify-center">
       {slots.photo1 && (
-        <PolaroidFrame slot={slots.photo1} size={144} className="ml-[4%] self-start" />
+        <PolaroidFrame
+          slot={slots.photo1}
+          size={FRAME_SIZE.pairStory}
+          maxHeight={180}
+          className="ml-[4%] self-start"
+        />
       )}
       {slots.photo2 && (
         <PolaroidFrame
           slot={slots.photo2}
-          size={144}
-          className="-mt-6 mr-[4%] self-end"
+          size={FRAME_SIZE.pairStory}
+          maxHeight={180}
+          className="-mt-10 mr-[4%] self-end"
         />
       )}
       <TextBlock
@@ -161,13 +192,28 @@ function LayoutTrioText({ slots, theme }: LayoutProps) {
       {/* Three photos plus a story is the tightest layout — keep the frames
           small and heavily overlapped so the text still fits the page. */}
       {slots.photo1 && (
-        <PolaroidFrame slot={slots.photo1} size={112} className="ml-[3%] self-start" />
+        <PolaroidFrame
+          slot={slots.photo1}
+          size={FRAME_SIZE.trioStory}
+          maxHeight={146}
+          className="ml-[3%] self-start"
+        />
       )}
       {slots.photo2 && (
-        <PolaroidFrame slot={slots.photo2} size={112} className="-mt-7 mr-[3%] self-end" />
+        <PolaroidFrame
+          slot={slots.photo2}
+          size={FRAME_SIZE.trioStory}
+          maxHeight={146}
+          className="-mt-12 mr-[3%] self-end"
+        />
       )}
       {slots.photo3 && (
-        <PolaroidFrame slot={slots.photo3} size={112} className="-mt-7 self-center" />
+        <PolaroidFrame
+          slot={slots.photo3}
+          size={FRAME_SIZE.trioStory}
+          maxHeight={146}
+          className="-mt-12 self-center"
+        />
       )}
       <TextBlock
         slot={slots.text1}
@@ -181,7 +227,7 @@ function LayoutTrioText({ slots, theme }: LayoutProps) {
 function LayoutVideo({ slots, theme }: LayoutProps) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4">
-      {slots.video1 && <FilmFrame slot={slots.video1} size={224} />}
+      {slots.video1 && <FilmFrame slot={slots.video1} size={FRAME_SIZE.film} maxHeight={370} />}
       <TextBlock
         slot={slots.text1}
         theme={theme}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FRAME_RATIO, frameWidth, toFrameFormat } from "@/lib/frames";
+import { frameBox, toFrameFormat } from "@/lib/frames";
 import type { SlotData } from "@/lib/types";
 
 // Sprocket holes run down the long edges of the strip: vertically for
@@ -46,19 +46,23 @@ function Sprockets({
  */
 export function FilmFrame({
   slot,
-  size = 256,
+  size,
+  maxHeight,
   className = "",
 }: {
   slot: SlotData;
-  /** Frame height budget in px; the real width follows the slot's format. */
-  size?: number;
-  /** Positioning only — width comes from `size` + format. */
+  /** Optical size from the FRAME_SIZE scale — not a width (see frameBox). */
+  size: number;
+  /** Layout's height ceiling, so a portrait clip can't outgrow the page. */
+  maxHeight?: number;
+  /** Positioning only — the box comes from size + format. */
   className?: string;
 }) {
   const [playing, setPlaying] = useState(false);
   const frameRef = useRef<HTMLElement | null>(null);
   const alt = slot.caption || "video kenangan";
   const format = toFrameFormat(slot.aspect);
+  const { width, height } = frameBox(size, format, maxHeight);
   // Landscape film runs horizontally, so its sprockets move to top/bottom.
   const vertical = format !== "landscape";
   const holes = format === "portrait" ? 9 : format === "square" ? 7 : 8;
@@ -93,7 +97,7 @@ export function FilmFrame({
     <figure
       className={`relative max-w-full ${className}`}
       style={{
-        width: frameWidth(size, format),
+        width: width + (vertical ? 40 : 24),
         transform: `rotate(${slot.rotation}deg)`,
       }}
       ref={frameRef}
@@ -105,10 +109,7 @@ export function FilmFrame({
       >
         <Sprockets side="start" count={holes} vertical={vertical} />
         <Sprockets side="end" count={holes} vertical={vertical} />
-        <div
-          className="relative w-full overflow-hidden bg-black"
-          style={{ aspectRatio: FRAME_RATIO[format] }}
-        >
+        <div className="relative w-full overflow-hidden bg-black" style={{ height }}>
           {slot.videoUrl ? (
             playing ? (
               <video

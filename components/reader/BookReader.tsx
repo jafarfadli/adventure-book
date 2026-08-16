@@ -35,6 +35,10 @@ export default function BookReader({
   // 0 = left, 1 = right. The closed cover sits on the right half.
   const [half, setHalf] = useState<0 | 1>(1);
   const [start, setStart] = useState(initialPage);
+  // Whether the book reads as shut (cover) rather than open (spread). Set on
+  // intent so the pink cover, the page block and their shadows change with
+  // the gesture; reconciled in onFlip so a corner drag stays in sync too.
+  const [shut, setShut] = useState(initialPage === 0);
   const [dir, setDir] = useState(1);
   const [copied, setCopied] = useState(false);
   const reducedMotion = useReducedMotion();
@@ -98,6 +102,7 @@ export default function BookReader({
       setStart(isSpread ? initialPage - (initialPage % 2) : initialPage);
     }
     setHalf(initialPage === 0 ? 1 : initialPage % 2 === 1 ? 0 : 1);
+    setShut(initialPage === 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPage, flipMode]);
 
@@ -109,6 +114,7 @@ export default function BookReader({
         setHalf(1);
         return;
       }
+      if (start === 0) setShut(false);
       if (cameraMode) setHalf(0);
       flipRef.current?.pageFlip()?.flipNext();
       return;
@@ -125,6 +131,7 @@ export default function BookReader({
       }
       // Flipping back lands on the previous spread's right-hand page (and
       // the closed cover also sits on the right half).
+      if (start === 1) setShut(true);
       if (cameraMode) setHalf(1);
       flipRef.current?.pageFlip()?.flipPrev();
       return;
@@ -189,9 +196,10 @@ export default function BookReader({
   const CAM_PEEK = 40;
   const CAM_SPAN = CAM_RIM + CAM_PEEK;
   // The closed cover is its own thing: a book seen shut, framed on all four
-  // sides. `half` flips the instant a turn starts, so the framing swaps
-  // under the motion instead of popping when the animation lands.
-  const isCoverView = start === 0 && half === 1;
+  // sides. Driven by `shut`, which flips the instant a turn is asked for —
+  // `start` only lands when the animation ends, which made the cover chrome
+  // arrive late on open and linger on close.
+  const isCoverView = shut;
   const camTransform =
     isCoverView
       ? `translateX(calc(${CAM_SPAN / 2 + CAM_SPAN}px - 100vw))`
@@ -288,16 +296,27 @@ export default function BookReader({
               half only, so the chrome follows the open half. */}
           {!cameraMode && (
             <>
+              {/* Opening widens the cover and the page block across the
+                  spread; closing snaps them back with the cover so nothing
+                  lingers over the shut book. */}
               <div
                 aria-hidden
-                className={`absolute -top-2.5 -bottom-4 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 ${
-                  start === 0 ? "left-1/2 -right-3" : "-inset-x-3"
+                className={`absolute -top-2.5 -bottom-4 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] transition-[left,right] ease-out ${
+                  shut ? "left-1/2 -right-3 duration-0" : "-inset-x-3 duration-[450ms]"
                 }`}
               />
               <div
                 aria-hidden
-                className={`absolute -bottom-2.5 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] ${
-                  start === 0 ? "left-[51%] right-0" : "inset-x-0"
+                className={`absolute -top-2.5 -bottom-4 rounded-md shadow-2xl shadow-black/40 transition-[left,right,opacity] ease-out ${
+                  shut
+                    ? "left-1/2 -right-3 opacity-100 duration-0"
+                    : "-inset-x-3 opacity-100 delay-150 duration-[600ms]"
+                }`}
+              />
+              <div
+                aria-hidden
+                className={`absolute -bottom-2.5 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] transition-[left,right] ease-out ${
+                  shut ? "left-[51%] right-0 duration-0" : "inset-x-0 duration-[450ms]"
                 }`}
               />
             </>
@@ -309,8 +328,8 @@ export default function BookReader({
                   cover leaves an even pink border inside it. */}
               <div
                 aria-hidden
-                className={`pointer-events-none absolute inset-x-0 -top-px bottom-0 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 transition-opacity duration-500 ${
-                  isCoverView ? "opacity-100" : "opacity-0"
+                className={`pointer-events-none absolute inset-x-0 -top-px bottom-0 rounded-md bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 transition-opacity ${
+                  isCoverView ? "opacity-100 duration-0" : "opacity-0 duration-200"
                 }`}
               />
               {/* Full-bleed window onto a book wider than the screen. The
@@ -320,8 +339,8 @@ export default function BookReader({
               <div className="relative -mx-4 overflow-hidden pt-2.5 pb-5">
                 <div
                   aria-hidden
-                  className={`absolute inset-0 bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] shadow-2xl shadow-black/40 transition-opacity duration-500 ${
-                    isCoverView ? "opacity-0" : "opacity-100"
+                  className={`absolute inset-0 bg-gradient-to-br from-[#ffb3dd] via-[#ff97d0] to-[#f277b8] transition-opacity ${
+                    isCoverView ? "opacity-0 duration-0" : "opacity-100 duration-200"
                   }`}
                 />
                 <div
@@ -335,7 +354,9 @@ export default function BookReader({
                       whole spread; under the shut cover, only its half. */}
                   <div
                     aria-hidden
-                    className="pointer-events-none absolute -bottom-3 right-0 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] transition-[left] duration-[650ms] ease-in-out"
+                    className={`pointer-events-none absolute -bottom-3 right-0 h-3 bg-[repeating-linear-gradient(to_bottom,#fdfaf1_0_2px,#cfc6b0_2px_3px)] transition-[left] ease-out ${
+                      isCoverView ? "duration-0" : "duration-[450ms]"
+                    }`}
                     style={{ left: isCoverView ? "calc(100vw - 54px)" : 0 }}
                   />
                   <FlipBook
@@ -346,7 +367,10 @@ export default function BookReader({
                     theme={theme}
                     startPage={flipInitial}
                     useMouseEvents={false}
-                    onFlip={setStart}
+                    onFlip={(p) => {
+                      setStart(p);
+                      setShut(p === 0);
+                    }}
                   />
                 </div>
               </div>
@@ -359,7 +383,10 @@ export default function BookReader({
               meta={meta}
               theme={theme}
               startPage={flipInitial}
-              onFlip={setStart}
+              onFlip={(p) => {
+                setStart(p);
+                setShut(p === 0);
+              }}
             />
           )}
         </motion.div>

@@ -1,32 +1,39 @@
-import { FRAME_RATIO, frameWidth, toFrameFormat } from "@/lib/frames";
+import { frameBox, toFrameFormat } from "@/lib/frames";
 import { TAPE_STYLES } from "@/lib/tapes";
 import type { SlotData } from "@/lib/types";
 
 export function PolaroidFrame({
   slot,
-  size = 288,
+  size,
+  maxHeight,
   className = "",
 }: {
   slot: SlotData;
-  /** Frame height budget in px; the real width follows the slot's format. */
-  size?: number;
-  /** Positioning only — width comes from `size` + format. */
+  /** Optical size from the FRAME_SIZE scale — not a width (see frameBox). */
+  size: number;
+  /** Layout's height ceiling, so a portrait frame can't outgrow the page. */
+  maxHeight?: number;
+  /** Positioning only — the box comes from size + format. */
   className?: string;
 }) {
   const alt = slot.caption || "foto kenangan";
   const format = toFrameFormat(slot.aspect);
+  const { width, height } = frameBox(size, format, maxHeight);
   const tape = slot.tapeStyle
     ? (TAPE_STYLES[slot.tapeStyle] ?? TAPE_STYLES.classic).className
     : null;
-  // A polaroid's border is thinner on a small frame; scale it with the width
-  // so a portrait strip doesn't look like it's drowning in white.
-  const pad = format === "portrait" ? "p-2 pb-1.5" : "p-3 pb-2";
+  // A polaroid's border is thinner on a narrow frame, so a portrait strip
+  // doesn't look like it's drowning in white.
+  const pad = format === "portrait" ? 8 : 12;
 
   return (
     <figure
-      className={`relative max-w-full bg-white shadow-xl shadow-black/20 ${pad} ${className}`}
+      className={`relative max-w-full bg-white shadow-xl shadow-black/20 ${className}`}
       style={{
-        width: frameWidth(size, format),
+        width: width + pad * 2,
+        paddingInline: pad,
+        paddingTop: pad,
+        paddingBottom: pad * 0.7,
         transform: `rotate(${slot.rotation}deg)`,
       }}
     >
@@ -43,12 +50,12 @@ export function PolaroidFrame({
           src={slot.imageUrl}
           alt={alt}
           className="w-full bg-stone-100 object-cover"
-          style={{ aspectRatio: FRAME_RATIO[format] }}
+          style={{ height }}
         />
       ) : (
         <div
           className="flex w-full items-center justify-center border-2 border-dashed border-stone-300 bg-stone-50"
-          style={{ aspectRatio: FRAME_RATIO[format] }}
+          style={{ height }}
         >
           <span className="font-hand text-lg text-stone-400">belum ada foto</span>
         </div>
