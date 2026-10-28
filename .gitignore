@@ -43,3 +43,6 @@ next-env.d.ts
 
 # user media (UPLOAD_DIR) — irreplaceable, back up separately
 /uploads/
+
+# brainstorming companion mockups
+/.superpowers/
