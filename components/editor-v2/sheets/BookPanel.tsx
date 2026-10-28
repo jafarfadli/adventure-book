@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { deleteEmptyBookV2 } from "@/actions/v2/shelf";
 import { Icon, IconButton } from "@/components/v2/Icon";
 import type { BookPatch } from "@/lib/v2/edit";
 import type { BookV2 } from "@/lib/v2/types";
@@ -14,7 +16,8 @@ import { ThemeRow } from "./Pickers";
 const field =
   "h-12 w-full rounded-xl border border-[#e7dfe2] bg-white px-3 font-hand text-2xl font-bold text-[#2b2326] focus-visible:outline-2 focus-visible:outline-[#2b2326]";
 
-export function BookPanel({ book, onPatch }: { book: BookV2; onPatch: (p: BookPatch) => void }) {
+export function BookPanel({ book, onPatch, shelfHref = "/" }: { book: BookV2; onPatch: (p: BookPatch) => void; shelfHref?: string }) {
+  const router = useRouter();
   const [title, setTitle] = useState(book.title);
   const [volume, setVolume] = useState(String(book.volume));
   const [coverText, setCoverText] = useState(book.coverText ?? "");
@@ -122,6 +125,20 @@ export function BookPanel({ book, onPatch }: { book: BookV2; onPatch: (p: BookPa
           <ThemeRow current={book.theme} bookTheme={book.theme} allowFollow={false} onPick={(t) => t && onPatch({ theme: t })} />
         </div>
       </div>
+      {book.pages.length === 0 && (
+        <div className="flex justify-end">
+          <IconButton
+            icon="trash"
+            label="Hapus buku kosong"
+            variant="ghost"
+            className="text-[#a3324f]"
+            onClick={async () => {
+              await deleteEmptyBookV2(book.id);
+              router.push(shelfHref);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

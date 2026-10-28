@@ -99,12 +99,12 @@ export function World({
         onProgress={(p) => timeline.current?.setProgress(p)}
         onMetrics={setMetrics}
         onKeyDown={travelKeys(layout.stops, layout.width)}
-        wishlistHref={`/book/${book.slug}/wishlist`}
+        wishlistHref={`/wishlist${hrefSuffix}`}
         onCloseBook={() => setBackCover(true)}
         label={`${book.title} — geser untuk membaca`}
       />
 
-      <TopChrome mapHref={`/book/${book.slug}/map`} wishlistHref={`/book/${book.slug}/wishlist`} shareTitle={book.title} />
+      <TopChrome mapHref={`/map${hrefSuffix}`} wishlistHref={`/wishlist${hrefSuffix}`} shelfHref={`/${hrefSuffix}`} shareTitle={book.title} />
       <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 flex items-center gap-2 [&>*]:pointer-events-auto">
         <MusicButton />
         <Timeline ref={timeline} marks={marks} onSeek={(p, smooth) => canvas.current?.seek(p, smooth)} />

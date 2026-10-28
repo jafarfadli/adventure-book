@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { CuteBackdrop } from "@/components/reader/CuteBackdrop";
 import { WishlistView, type WishItem } from "@/components/wishlist/WishlistView";
 import { prisma } from "@/lib/db";
+import { isV2, v2Suffix } from "@/lib/v2/flag";
 import { getTheme } from "@/lib/themes";
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ v?: string }> };
 
 const dateFmt = new Intl.DateTimeFormat("id-ID", {
   day: "numeric",
@@ -23,8 +24,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: `Wishlist — ${book.title}` };
 }
 
-export default async function WishlistPage({ params }: Props) {
+export default async function WishlistPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const sp = await searchParams;
+  // v2: one map / wishlist for the whole shelf
+  if (isV2(sp.v)) redirect(`/wishlist${v2Suffix(sp.v)}`);
 
   const book = await prisma.book.findUnique({
     where: { slug },

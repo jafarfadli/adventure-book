@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { EditorShell } from "@/components/editor/EditorShell";
 import { EditorWorld } from "@/components/editor-v2/EditorWorld";
-import { getEditorBookId } from "@/lib/auth";
+import { canEditBook, getEditorBookId } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { loadBookV2 } from "@/lib/v2/book";
 import { isV2, v2Suffix } from "@/lib/v2/flag";
@@ -19,7 +19,7 @@ export default async function EditPage({ params, searchParams }: Props) {
     const book = await loadBookV2(slug);
     if (!book) notFound();
     const suffix = v2Suffix(sp.v);
-    if ((await getEditorBookId()) !== book.id) redirect(`/book/${slug}/unlock${suffix}`);
+    if (!(await canEditBook(book.id))) redirect(`/book/${slug}/unlock${suffix}`);
     return <EditorWorld initial={book} readerHref={`/book/${slug}${suffix}`} />;
   }
 

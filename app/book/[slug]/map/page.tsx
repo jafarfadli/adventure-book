@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { MapShell } from "@/components/map/MapShell";
 import type { MapMarkerData } from "@/components/map/MapView";
 import { prisma } from "@/lib/db";
+import { isV2, v2Suffix } from "@/lib/v2/flag";
 import { getTheme } from "@/lib/themes";
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ v?: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
@@ -18,8 +19,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: `Peta kenangan — ${book.title}` };
 }
 
-export default async function MapPage({ params }: Props) {
+export default async function MapPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const sp = await searchParams;
+  // v2: one map / wishlist for the whole shelf
+  if (isV2(sp.v)) redirect(`/map${v2Suffix(sp.v)}`);
 
   const book = await prisma.book.findUnique({
     where: { slug },

@@ -239,7 +239,7 @@ export function EditorWorld({ initial, readerHref }: { initial: BookV2; readerHr
           if (e.key === "Escape") return clearSelection();
           travelKeys(layout.stops, layout.width)(e, api);
         }}
-        wishlistHref={`/book/${book.slug}/wishlist`}
+        wishlistHref="/wishlist"
         overlay={overlay}
         station={station}
         onItemsPointer={onItemsClick}

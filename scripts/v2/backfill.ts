@@ -16,7 +16,7 @@ const args = process.argv.slice(2);
 const step = args.find((a) => !a.startsWith("--")) ?? "";
 const dryRun = args.includes("--dry-run");
 const allowProd = args.includes("--allow-prod");
-const STEPS = ["media-dims", "taken-at", "templates", "book-parts"] as const;
+const STEPS = ["media-dims", "taken-at", "templates", "book-parts", "shelf"] as const;
 
 function guardDatabase() {
   const raw = process.env.DATABASE_URL;
@@ -90,6 +90,31 @@ async function bookParts() {
   }
 }
 
+/** One shelf holding every book; its password is copied from the first book, so nothing changes for the couple. */
+async function shelf() {
+  const books = await prisma.book.findMany({
+    orderBy: { createdAt: "asc" },
+    select: { id: true, slug: true, title: true, editPasswordHash: true, shelfId: true, volume: true },
+  });
+  if (books.length === 0) return console.log("shelf: no books");
+  let s = await prisma.shelf.findFirst({ select: { id: true } });
+  if (!s) {
+    console.log(`shelf: create "${books[0].title}"${dryRun ? " (dry run)" : ""}`);
+    if (dryRun) return;
+    s = await prisma.shelf.create({ data: { title: books[0].title, editPasswordHash: books[0].editPasswordHash }, select: { id: true } });
+  }
+  let attached = 0;
+  for (const [i, b] of books.entries()) {
+    if (b.shelfId) continue;
+    attached++;
+    if (!dryRun) await prisma.book.update({ where: { id: b.id }, data: { shelfId: s.id, shelfOrder: i, volume: b.volume ?? i + 1 } });
+  }
+  const wishes = dryRun
+    ? await prisma.wishlistItem.count({ where: { shelfId: null } })
+    : (await prisma.wishlistItem.updateMany({ where: { shelfId: null }, data: { shelfId: s.id } })).count;
+  console.log(`shelf: ${attached} books attached, ${wishes} wishlist items moved${dryRun ? " (dry run)" : ""}`);
+}
+
 async function main() {
   const db = guardDatabase();
   console.log(`database: ${db}`);
@@ -100,6 +125,7 @@ async function main() {
     if (s === "taken-at") await takenAt();
     if (s === "templates") await templates();
     if (s === "book-parts") await bookParts();
+    if (s === "shelf") await shelf();
   }
 }
 

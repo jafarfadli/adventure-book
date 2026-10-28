@@ -18,7 +18,17 @@ function IconLink({ href, icon, label }: { href: string; icon: IconName; label: 
   );
 }
 
-export function TopChrome({ mapHref, wishlistHref, shareTitle }: { mapHref: string; wishlistHref: string; shareTitle: string }) {
+export function TopChrome({
+  mapHref,
+  wishlistHref,
+  shelfHref,
+  shareTitle,
+}: {
+  mapHref: string;
+  wishlistHref: string;
+  shelfHref?: string;
+  shareTitle: string;
+}) {
   const [copied, setCopied] = useState(false);
   async function share() {
     const url = window.location.href.replace(/[?&]v=2\b/, "");
@@ -35,11 +45,18 @@ export function TopChrome({ mapHref, wishlistHref, shareTitle }: { mapHref: stri
     }
   }
   return (
+    <>
+    {shelfHref && (
+      <div className="pointer-events-none absolute top-3 left-3 z-30 [&>*]:pointer-events-auto">
+        <IconLink href={shelfHref} icon="shelf" label="Rak buku" />
+      </div>
+    )}
     <div className="pointer-events-none absolute top-3 right-3 z-30 flex gap-2 [&>*]:pointer-events-auto">
       <IconLink href={mapHref} icon="map" label="Peta kenangan" />
       <IconLink href={wishlistHref} icon="spark" label="Wishlist" />
       <IconButton icon={copied ? "check" : "share"} label={copied ? "Link tersalin" : "Bagikan"} onClick={share} />
     </div>
+    </>
   );
 }
 
