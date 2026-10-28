@@ -129,12 +129,13 @@ export async function updateSlotV2(pageIdRaw: string, keyRaw: string, patchRaw: 
   const existing = page.slots.find((s) => s.key === key);
   if (!spec && !existing) throw new Error(`Slot "${key}" is not part of this page`);
 
-  // a manual pin is never silently replaced by EXIF from a re-upload
-  if (patch.locationSource === "exif" && existing?.locationSource === "manual") {
+  // a new (or removed) file never moves a pin the couple placed by hand;
+  // only an explicit location edit does (including undoing one)
+  const fileChange = "imageUrl" in patch || "videoUrl" in patch;
+  if (fileChange && existing?.locationSource === "manual") {
     delete patch.lat;
     delete patch.lng;
     delete patch.locationSource;
-    delete patch.locationLabel;
   }
 
   const data = toSlotData(patch);

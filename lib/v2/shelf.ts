@@ -1,5 +1,14 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { toThemeKey, type ThemeKey } from "./themes";
+
+/**
+ * A shelf's wishes: filed under the shelf (v2), or under one of its books
+ * (v1 keeps filing them that way while it is still served).
+ */
+export function shelfWishes(shelfId: string): Prisma.WishlistItemWhereInput {
+  return { OR: [{ shelfId }, { book: { shelfId } }] };
+}
 
 export type ShelfBook = {
   id: string;

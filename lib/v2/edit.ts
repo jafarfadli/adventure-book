@@ -1,6 +1,7 @@
 import { slotSpecs, type TemplateKey } from "./templates";
 import type { ThemeKey } from "./themes";
 import { emptySlot, type BookV2, type PageV2, type SlotV2 } from "./types";
+import { bookStats } from "./visible";
 
 // Pure edits on the client's copy of a book. The editor applies them
 // optimistically, sends the same change to the server, and keeps the
@@ -33,7 +34,7 @@ export type BookPatch = Partial<
 >;
 
 function mapPage(book: BookV2, pageId: string, f: (p: PageV2) => PageV2): BookV2 {
-  return { ...book, pages: book.pages.map((p) => (p.id === pageId ? f(p) : p)) };
+  return withStats(book, book.pages.map((p) => (p.id === pageId ? f(p) : p)));
 }
 
 function slotType(key: string): SlotV2["type"] {
@@ -71,8 +72,9 @@ export function setPageSeed(book: BookV2, pageId: string, seed: number): BookV2 
   return mapPage(book, pageId, (p) => ({ ...p, decorSeed: seed }));
 }
 
+/** The end of the book shows these, so they follow every edit. */
 function withStats(book: BookV2, pages: PageV2[]): BookV2 {
-  return { ...book, pages, stats: { ...book.stats, stops: pages.length } };
+  return { ...book, pages, stats: bookStats(pages) };
 }
 
 export function insertPages(book: BookV2, index: number, pages: PageV2[]): BookV2 {

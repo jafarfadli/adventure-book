@@ -31,7 +31,10 @@ export function TopChrome({
 }) {
   const [copied, setCopied] = useState(false);
   async function share() {
-    const url = window.location.href.replace(/[?&]v=2\b/, "");
+    // the shared link follows the site's default version, whatever this preview uses
+    const u = new URL(window.location.href);
+    u.searchParams.delete("v");
+    const url = u.toString();
     try {
       if (navigator.share) {
         await navigator.share({ title: shareTitle, url });

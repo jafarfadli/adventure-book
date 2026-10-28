@@ -1,7 +1,8 @@
-import { monthKey, monthLabel, shortMonth, slotDate } from "./dates";
+import { monthKey, monthLabel, shortMonth } from "./dates";
 import { TEMPLATES } from "./templates";
 import { THEMES, type ThemeKey } from "./themes";
 import type { PageV2 } from "./types";
+import { pageDate } from "./visible";
 
 // Layout of one book as a single horizontal world, in design units. Pure and
 // deterministic: the reader, the editor and the tests all call this.
@@ -37,14 +38,6 @@ export type WorldLayout = {
   seams: Seam[];
   stops: StopInfo[];
 };
-
-function pageDate(p: PageV2): Date | null {
-  for (const s of Object.values(p.slots)) {
-    const d = slotDate(s);
-    if (d) return d;
-  }
-  return null;
-}
 
 export function layoutWorld(pages: PageV2[], bookTheme: ThemeKey): WorldLayout {
   const segments: Segment[] = [];

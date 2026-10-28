@@ -3,7 +3,7 @@ import { Wishlist, type Wish } from "@/components/wishlist-v2/Wishlist";
 import { getEditorShelfId } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { v2Suffix } from "@/lib/v2/flag";
-import { loadShelf } from "@/lib/v2/shelf";
+import { loadShelf, shelfWishes } from "@/lib/v2/shelf";
 
 export const metadata: Metadata = { title: "Wishlist" };
 
@@ -13,8 +13,9 @@ export default async function WishlistRoute({ searchParams }: Props) {
   const sp = await searchParams;
   const shelf = await loadShelf();
   const rows = await prisma.wishlistItem.findMany({
-    where: shelf ? { shelfId: shelf.id } : {},
-    orderBy: { order: "asc" },
+    // before the shelf backfill there is one book, and every wishlist is public
+    where: shelf ? shelfWishes(shelf.id) : {},
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     select: { id: true, text: true, done: true, doneAt: true },
   });
   const items: Wish[] = rows.map((r) => ({ ...r, doneAt: r.doneAt ? r.doneAt.toISOString() : null }));

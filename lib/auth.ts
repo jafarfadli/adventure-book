@@ -61,16 +61,23 @@ export async function getEditorBookId(): Promise<string | null> {
 }
 
 /**
- * The shelf the current session may edit, or null. A v1 token (book only,
- * from before shelves existed) counts for the shelf its book sits on, so
- * nobody has to unlock again after the switch.
+ * The shelf a session may edit, or null. A v1 token (book only, from before
+ * shelves existed) counts for the shelf its book sits on, as long as it was
+ * unlocked with the shelf's password (the shelf took its hash from that
+ * book), so nobody has to unlock again after the switch.
  */
+async function sessionShelfId(s: SessionPayload): Promise<string | null> {
+  if (typeof s.shelfId === "string") return s.shelfId;
+  const book = await prisma.book.findUnique({
+    where: { id: s.bookId },
+    select: { editPasswordHash: true, shelf: { select: { id: true, editPasswordHash: true } } },
+  });
+  return book?.shelf && book.shelf.editPasswordHash === book.editPasswordHash ? book.shelf.id : null;
+}
+
 export async function getEditorShelfId(): Promise<string | null> {
   const s = await readSession();
-  if (!s) return null;
-  if (typeof s.shelfId === "string") return s.shelfId;
-  const book = await prisma.book.findUnique({ where: { id: s.bookId }, select: { shelfId: true } });
-  return book?.shelfId ?? null;
+  return s ? sessionShelfId(s) : null;
 }
 
 /** Whether the session may edit this book: unlocked from it, or from its shelf. */
@@ -78,9 +85,10 @@ export async function canEditBook(bookId: string): Promise<boolean> {
   const s = await readSession();
   if (!s) return false;
   if (s.bookId === bookId) return true;
-  if (!s.shelfId) return false;
+  const shelfId = await sessionShelfId(s);
+  if (!shelfId) return false;
   const book = await prisma.book.findUnique({ where: { id: bookId }, select: { shelfId: true } });
-  return book?.shelfId === s.shelfId;
+  return book?.shelfId === shelfId;
 }
 
 /**

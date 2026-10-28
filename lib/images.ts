@@ -30,16 +30,14 @@ export async function processUpload(
   const id = randomUUID();
   const dir = uploadDir();
 
-  // Orientation-corrected dimensions, so a portrait phone shot reads as
-  // portrait even when EXIF says the sensor was sideways.
-  const meta = await sharp(input).rotate().toBuffer({ resolveWithObject: true });
-  const aspect = detectFormat(meta.info.width, meta.info.height);
-
-  const main = await sharp(input)
+  // rotate() bakes in the EXIF orientation, so the stored size (and the
+  // frame format read from it) is what readers see: a portrait phone shot is
+  // portrait even when the sensor was sideways.
+  const { data: main, info } = await sharp(input)
     .rotate()
     .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
     .webp({ quality: 82 })
-    .toBuffer();
+    .toBuffer({ resolveWithObject: true });
   const thumb = await sharp(input)
     .rotate()
     .resize({ width: 400, height: 400, fit: "inside", withoutEnlargement: true })
@@ -49,15 +47,14 @@ export async function processUpload(
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, `${id}.webp`), main);
   await writeFile(path.join(dir, `${id}.thumb.webp`), thumb);
-  const stored = await sharp(main).metadata();
 
   // Stored with the base path so <img src> works as-is under the subpath.
   return {
     imageUrl: withBase(`/api/media/${id}.webp`),
     thumbUrl: withBase(`/api/media/${id}.thumb.webp`),
-    aspect,
+    aspect: detectFormat(info.width, info.height),
     // v2 picks templates and crops by the stored pixel size
-    width: stored.width ?? meta.info.width,
-    height: stored.height ?? meta.info.height,
+    width: info.width,
+    height: info.height,
   };
 }

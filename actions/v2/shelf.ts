@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getEditorShelfId, requireShelfEditor } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { shelfWishes } from "@/lib/v2/shelf";
 import { slugify, uniqueSlug } from "@/lib/v2/slug";
 import { THEME_KEYS } from "@/lib/v2/themes";
 
@@ -50,8 +51,9 @@ export async function addWishV2(textRaw: string): Promise<{ id: string; text: st
   const shelfId = await sessionShelf();
   // v1 still files wishes under a book: use the shelf's first one
   const first = await prisma.book.findFirstOrThrow({ where: { shelfId }, orderBy: { shelfOrder: "asc" }, select: { id: true } });
-  const count = await prisma.wishlistItem.count({ where: { shelfId } });
-  const item = await prisma.wishlistItem.create({ data: { shelfId, bookId: first.id, text, order: count } });
+  // appended after the last one (a count would collide once something is deleted)
+  const { _max } = await prisma.wishlistItem.aggregate({ where: shelfWishes(shelfId), _max: { order: true } });
+  const item = await prisma.wishlistItem.create({ data: { shelfId, bookId: first.id, text, order: (_max.order ?? -1) + 1 } });
   revalidateWishlist();
   return { id: item.id, text: item.text, done: false, doneAt: null };
 }
@@ -59,8 +61,11 @@ export async function addWishV2(textRaw: string): Promise<{ id: string; text: st
 async function ownWish(idRaw: string) {
   const id = wishId.parse(idRaw);
   const shelfId = await sessionShelf();
-  const item = await prisma.wishlistItem.findUniqueOrThrow({ where: { id }, select: { id: true, shelfId: true, done: true } });
-  if (item.shelfId !== shelfId) throw new Error("Unauthorized: not on this shelf");
+  const item = await prisma.wishlistItem.findUniqueOrThrow({
+    where: { id },
+    select: { id: true, shelfId: true, done: true, book: { select: { shelfId: true } } },
+  });
+  if (item.shelfId !== shelfId && item.book.shelfId !== shelfId) throw new Error("Unauthorized: not on this shelf");
   return item;
 }
 

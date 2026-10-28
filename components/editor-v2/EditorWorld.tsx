@@ -151,9 +151,12 @@ export function EditorWorld({ initial, readerHref }: { initial: BookV2; readerHr
         takenAt: r.takenAt ?? null,
         focusX: 0.5,
         focusY: 0.5,
-        ...(r.lat != null && r.lng != null && slot?.locationSource !== "manual"
-          ? { lat: r.lat, lng: r.lng, locationSource: "exif" as const }
-          : {}),
+        // a pin the couple placed stays; one read from the old file goes with it
+        ...(slot?.locationSource === "manual"
+          ? {}
+          : r.lat != null && r.lng != null
+            ? { lat: r.lat, lng: r.lng, locationSource: "exif" as const }
+            : { lat: null, lng: null, locationSource: null }),
       });
     } catch {
       // the warning stays visible on the status icon; nothing changed
@@ -204,7 +207,16 @@ export function EditorWorld({ initial, readerHref }: { initial: BookV2; readerHr
               label: "Kosongkan",
               danger: true,
               onClick: () =>
-                ed.editSlot(page.id, sel.key, { imageUrl: null, thumbUrl: null, videoUrl: null, width: null, height: null }),
+                ed.editSlot(page.id, sel.key, {
+                  imageUrl: null,
+                  thumbUrl: null,
+                  videoUrl: null,
+                  width: null,
+                  height: null,
+                  // what was read from the file leaves with it; the couple's own pin, label and date stay
+                  takenAt: null,
+                  ...(slot.locationSource === "manual" ? {} : { lat: null, lng: null, locationSource: null }),
+                }),
             },
           ]
         : []),

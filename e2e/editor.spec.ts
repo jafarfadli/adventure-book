@@ -105,3 +105,66 @@ test("all pages: real-render tiles, tap to jump back", async ({ page }) => {
   await grid.getByRole("button", { name: "Halaman 5" }).click();
   await expect(grid).toBeHidden();
 });
+
+/** Make server actions fail as if the connection dropped, until `on()` is called. */
+async function goOffline(page: Page) {
+  let offline = true;
+  await page.route("**/*", (route) => {
+    const r = route.request();
+    if (offline && r.method() === "POST" && r.headers()["next-action"]) return route.abort("internetdisconnected");
+    return route.continue();
+  });
+  return { on: () => void (offline = false) };
+}
+
+test("a failed save keeps the edit and the retry sends it", async ({ page }) => {
+  await openEditor(page);
+  const cap = stops(page).nth(2).locator("[data-caption]").first();
+  const before = (await cap.textContent()) ?? "";
+  const net = await goOffline(page);
+  await cap.click();
+  await page.getByRole("textbox", { name: "Caption" }).fill("lewat sinyal jelek");
+  await page.getByRole("textbox", { name: "Caption" }).press("Enter");
+  const retry = page.getByRole("button", { name: "Gagal menyimpan — coba lagi" });
+  await expect(retry).toBeVisible({ timeout: 15_000 });
+  await expect(cap).toHaveText("lewat sinyal jelek");
+  net.on();
+  await retry.click();
+  await saved(page);
+  await page.reload();
+  await page.waitForSelector("section[data-page]");
+  await expect(stops(page).nth(2).locator("[data-caption]").first()).toHaveText("lewat sinyal jelek");
+  // put it back
+  await stops(page).nth(2).locator("[data-caption]").first().click();
+  await page.getByRole("textbox", { name: "Caption" }).fill(before);
+  await page.getByRole("textbox", { name: "Caption" }).press("Enter");
+  await saved(page);
+});
+
+test("undoing a delete that never reached the server brings the stop back", async ({ page }) => {
+  await openEditor(page);
+  const n = await stops(page).count();
+  await page.getByRole("button", { name: "Tambah halaman di sini" }).first().click();
+  await page.getByRole("button", { name: "Kutipan" }).click();
+  await expect(stops(page)).toHaveCount(n + 1);
+  await saved(page);
+
+  const net = await goOffline(page);
+  await page.getByRole("button", { name: "Hapus halaman" }).click();
+  await expect(stops(page)).toHaveCount(n);
+  await expect(page.getByRole("button", { name: "Gagal menyimpan — coba lagi" })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Urungkan" }).click();
+  await expect(stops(page)).toHaveCount(n + 1);
+  // nothing is left to send: the delete was dropped, not retried later
+  await saved(page);
+  net.on();
+  await page.reload();
+  await page.waitForSelector("section[data-page]");
+  await expect(stops(page)).toHaveCount(n + 1);
+
+  // clean up: the added stop is the first one
+  await stops(page).first().click({ position: { x: 8, y: 8 } });
+  await page.getByRole("button", { name: "Hapus halaman" }).click();
+  await expect(stops(page)).toHaveCount(n);
+  await saved(page);
+});

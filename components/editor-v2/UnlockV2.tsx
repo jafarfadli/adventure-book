@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Icon, IconButton } from "@/components/v2/Icon";
 import { withBase } from "@/lib/basePath";
@@ -8,7 +7,6 @@ import { THEMES, type ThemeKey } from "@/lib/v2/themes";
 
 /** Password on a paper card; the check opens the editor. */
 export function UnlockV2({ slug, theme, next }: { slug: string; theme: ThemeKey; next: string }) {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,17 +23,17 @@ export function UnlockV2({ slug, theme, next }: { slug: string; theme: ThemeKey;
         body: JSON.stringify({ slug, password }),
       });
       if (res.ok) {
-        router.replace(next);
-        router.refresh();
-        return;
+        // a full load: every page rendered before the cookie existed is dropped
+        // (a client replace + refresh can race and land back on this form)
+        window.location.replace(withBase(next));
+        return; // the spinner stays while the editor loads
       }
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
       setError(data?.error ?? "Coba lagi, ya.");
     } catch {
       setError("Coba lagi, ya.");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
 
   return (
