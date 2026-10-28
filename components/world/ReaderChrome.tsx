@@ -1,0 +1,53 @@
+"use client";
+
+import Link from "next/link";
+import { useState, useSyncExternalStore } from "react";
+import { Icon, IconButton, type IconName } from "@/components/v2/Icon";
+import { isMusicPlaying, subscribeMusic, toggleMusic } from "@/lib/musicPlayer";
+
+// Icon-only chrome floating over the world.
+
+const chip =
+  "inline-grid h-10 w-10 place-items-center rounded-full bg-[#fffaf5]/95 text-[#2b2326] shadow-[0_2px_8px_rgba(40,10,30,0.2)] transition hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b2326]";
+
+function IconLink({ href, icon, label }: { href: string; icon: IconName; label: string }) {
+  return (
+    <Link href={href} aria-label={label} title={label} className={chip}>
+      <Icon name={icon} />
+    </Link>
+  );
+}
+
+export function TopChrome({ mapHref, wishlistHref, shareTitle }: { mapHref: string; wishlistHref: string; shareTitle: string }) {
+  const [copied, setCopied] = useState(false);
+  async function share() {
+    const url = window.location.href.replace(/[?&]v=2\b/, "");
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: shareTitle, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // share sheet dismissed
+    }
+  }
+  return (
+    <div className="pointer-events-none absolute top-3 right-3 z-30 flex gap-2 [&>*]:pointer-events-auto">
+      <IconLink href={mapHref} icon="map" label="Peta kenangan" />
+      <IconLink href={wishlistHref} icon="spark" label="Wishlist" />
+      <IconButton icon={copied ? "check" : "share"} label={copied ? "Link tersalin" : "Bagikan"} onClick={share} />
+    </div>
+  );
+}
+
+export function MusicButton() {
+  const playing = useSyncExternalStore(subscribeMusic, isMusicPlaying, () => false);
+  return <IconButton icon={playing ? "music" : "music-off"} label={playing ? "Matikan musik" : "Putar musik"} onClick={() => void toggleMusic()} />;
+}
+
+export function EditLink({ href }: { href: string }) {
+  return <IconLink href={href} icon="pencil" label="Edit buku" />;
+}

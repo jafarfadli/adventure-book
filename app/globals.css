@@ -19,3 +19,14 @@ body {
 .paper-texture {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.28 0 0 0 0.045 0'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
 }
+
+/* v2: the start sign's arrow nudges towards the path */
+@keyframes ab-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(0.35em);
+  }
+}

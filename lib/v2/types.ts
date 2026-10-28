@@ -56,3 +56,20 @@ export function emptySlot(key: string, type: SlotV2["type"]): SlotV2 {
     height: null,
   };
 }
+
+export type BookV2 = {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  volume: number;
+  theme: ThemeKey;
+  coverImageUrl: string | null;
+  coverFocusX: number;
+  coverFocusY: number;
+  coverText: string | null;
+  closingText: string | null;
+  pages: PageV2[];
+  stats: { stops: number; media: number; first: string | null; last: string | null };
+  wishlistTop: { id: string; text: string }[];
+};

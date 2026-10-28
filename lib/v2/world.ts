@@ -15,7 +15,7 @@ import type { PageV2 } from "./types";
 export const GAP = 90;
 export const START_W = 420;
 export const SIGN_W = 180;
-export const END_W = 760;
+export const END_W = 880;
 /** Sky colours crossfade over this many units each side of a seam. */
 export const SKY_BLEND = 260;
 

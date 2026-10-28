@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import BookReader from "@/components/reader/BookReader";
+import { World } from "@/components/world/World";
 import { prisma } from "@/lib/db";
 import type { BookData } from "@/lib/types";
+import { loadBookV2 } from "@/lib/v2/book";
+import { isV2, v2Suffix } from "@/lib/v2/flag";
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; p?: string; v?: string }>;
 };
 
 async function fetchBook(slug: string): Promise<BookData | null> {
@@ -73,11 +76,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BookPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const sp = await searchParams;
+
+  if (isV2(sp.v)) {
+    const book = await loadBookV2(slug);
+    if (!book) notFound();
+    const order = Number.parseInt(sp.page ?? "", 10);
+    return (
+      <World
+        book={book}
+        initialPageId={sp.p ?? null}
+        initialOrder={Number.isFinite(order) ? order : null}
+        hrefSuffix={v2Suffix(sp.v)}
+      />
+    );
+  }
+
   const book = await fetchBook(slug);
   if (!book) notFound();
 
   // ?page= deep link (used by the memory map's click-to-page)
-  const { page } = await searchParams;
+  const { page } = sp;
   const parsed = Number.parseInt(page ?? "", 10);
   const initialPage = Number.isFinite(parsed)
     ? Math.min(Math.max(parsed, 0), Math.max(book.pages.length - 1, 0))
