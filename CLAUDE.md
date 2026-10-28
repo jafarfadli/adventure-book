@@ -250,8 +250,9 @@ tiles. Keep the attribution visible — it is a licence requirement.
   wishlist,ui}`, `actions/{book,pages,slots,wishlist}.ts`, `lib/{layouts,frames,tapes,themes,
   types}.ts`, `app/book/[slug]/wishlist/edit`. Do not extend it. Removing it (and `framer-motion`,
   `react-pageflip`) is a follow-up once the couple have confirmed v2.
-- **Rollback**: remove `ADVENTURE_V2` from `.env`, then `pm2 restart adventure-book --update-env`.
-  The database stays compatible both ways (v2 keeps `layout` in sync; v1 ignores the new columns).
+- **Rollback**: remove `ADVENTURE_V2` from `.env`, then `pm2 restart adventure-book` (Next reads
+  `.env` at every start; keep the flag out of PM2's own env so this keeps working). The database stays
+  compatible both ways (v2 keeps `layout` in sync; v1 ignores the new columns).
 - **Deferred destructive cleanup — only with the user's explicit OK**: drop `Slot.rotation`,
   `Slot.tapeStyle`, `Slot.aspect`, `Page.bgStyle`, `Book.editPasswordHash`, `WishlistItem.bookId`,
   the `COVER`/`CLOSING` pages and enum values.
@@ -341,11 +342,13 @@ The app is served under **`/adventure`** on the shared Funnel hostname
   `signum-web` come back via `pm2 resurrect`, started at boot by the LaunchDaemon
   `/Library/LaunchDaemons/com.PM2.daemon.plist` (user `jafarfadli`, `RunAtLoad` + `LaunchOnlyOnce`).
   After changing which apps PM2 manages, run `pm2 save`.
-- **Redeploy** (code only): `npm run build && pm2 restart adventure-book` (add `--update-env` after
-  editing `.env`).
+- **Redeploy** (code only): `npm run build && pm2 restart adventure-book`. A plain restart also picks
+  up `.env` edits.
 - **Release with database changes**:
-  1. Back up first: `pg_dump` to a dated file outside the repo, and copy `uploads/`.
-  2. `npm install`, then `npx prisma migrate deploy`.
+  1. Back up first: `pg_dump` to a dated file outside the repo, and copy `uploads/`
+     (`~/adventure-book-backups/<YYYY-MM-DD-HHMM>/`).
+  2. `npm install`, `npx prisma migrate deploy`, then `npx prisma generate` (npm 11 skips package
+     install scripts, so the client is not regenerated on its own).
   3. Run any needed backfill with `--allow-prod` (dry-run first).
   4. `npm run build && pm2 restart adventure-book`, then check the public URL.
 - `UPLOAD_DIR` and the database dumps belong in the backup routine — the photos are irreplaceable.
