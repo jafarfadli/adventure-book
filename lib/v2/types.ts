@@ -20,6 +20,8 @@ export type SlotV2 = {
   lat: number | null;
   lng: number | null;
   locationLabel: string | null;
+  /** "exif" | "manual" — a manual pin is never replaced by a re-upload's EXIF */
+  locationSource: string | null;
   width: number | null;
   height: number | null;
 };
@@ -32,6 +34,7 @@ export type PageV2 = {
   /** Page.theme as stored (null = follows the book) — the editor needs the difference */
   ownTheme: ThemeKey | null;
   decorSeed: number;
+  /** every slot row of the page, including ones the current template hides */
   slots: Record<string, SlotV2>;
 };
 
@@ -52,6 +55,7 @@ export function emptySlot(key: string, type: SlotV2["type"]): SlotV2 {
     lat: null,
     lng: null,
     locationLabel: null,
+    locationSource: null,
     width: null,
     height: null,
   };

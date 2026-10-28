@@ -26,7 +26,7 @@ export function uploadDir(): string {
  */
 export async function processUpload(
   input: Buffer,
-): Promise<{ imageUrl: string; thumbUrl: string; aspect: FrameFormat }> {
+): Promise<{ imageUrl: string; thumbUrl: string; aspect: FrameFormat; width: number; height: number }> {
   const id = randomUUID();
   const dir = uploadDir();
 
@@ -49,11 +49,15 @@ export async function processUpload(
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, `${id}.webp`), main);
   await writeFile(path.join(dir, `${id}.thumb.webp`), thumb);
+  const stored = await sharp(main).metadata();
 
   // Stored with the base path so <img src> works as-is under the subpath.
   return {
     imageUrl: withBase(`/api/media/${id}.webp`),
     thumbUrl: withBase(`/api/media/${id}.thumb.webp`),
     aspect,
+    // v2 picks templates and crops by the stored pixel size
+    width: stored.width ?? meta.info.width,
+    height: stored.height ?? meta.info.height,
   };
 }

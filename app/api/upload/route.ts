@@ -1,4 +1,5 @@
 import exifr from "exifr";
+import { parseExifDate } from "@/lib/v2/media";
 import { NextRequest, NextResponse } from "next/server";
 import { getEditorBookId } from "@/lib/auth";
 import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, processUpload } from "@/lib/images";
@@ -30,6 +31,17 @@ async function extractGps(
     // corrupt/unsupported EXIF — treat as no geotag
   }
   return { lat: null, lng: null };
+}
+
+/** Capture time from EXIF, read before re-encoding strips it. */
+async function extractTakenAt(buffer: Buffer): Promise<string | null> {
+  try {
+    const tags = await exifr.parse(buffer, { pick: ["DateTimeOriginal", "CreateDate"] });
+    const d = parseExifDate(tags?.DateTimeOriginal ?? tags?.CreateDate);
+    return d ? d.toISOString() : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -80,8 +92,9 @@ export async function POST(req: NextRequest) {
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
     const gps = await extractGps(buffer);
+    const takenAt = await extractTakenAt(buffer);
     const result = await processUpload(buffer);
-    return NextResponse.json({ ...result, ...gps });
+    return NextResponse.json({ ...result, ...gps, takenAt });
   } catch {
     // e.g. HEIC without libheif support, or a corrupt file.
     return NextResponse.json(

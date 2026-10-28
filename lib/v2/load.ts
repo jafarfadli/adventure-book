@@ -21,6 +21,7 @@ export const slotSelect = {
   lat: true,
   lng: true,
   locationLabel: true,
+  locationSource: true,
   width: true,
   height: true,
 } satisfies Prisma.SlotSelect;
@@ -55,6 +56,7 @@ export function toSlotV2(s: SlotRow): SlotV2 {
     lat: s.lat,
     lng: s.lng,
     locationLabel: s.locationLabel,
+    locationSource: s.locationSource,
     width: s.width,
     height: s.height,
   };
@@ -64,11 +66,10 @@ export function toSlotV2(s: SlotRow): SlotV2 {
 export function toPageV2(p: PageRow, bookTheme: string): PageV2 | null {
   const template = resolveTemplate(p);
   if (!template) return null;
+  // keep hidden slots too: switching back to a template restores them
   const slots: Record<string, SlotV2> = {};
-  for (const spec of slotSpecs(template)) {
-    const row = p.slots.find((s) => s.key === spec.key);
-    slots[spec.key] = row ? toSlotV2(row) : emptySlot(spec.key, spec.type);
-  }
+  for (const row of p.slots) slots[row.key] = toSlotV2(row);
+  for (const spec of slotSpecs(template)) slots[spec.key] ??= emptySlot(spec.key, spec.type);
   return {
     id: p.id,
     order: p.order,

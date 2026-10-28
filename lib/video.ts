@@ -8,6 +8,7 @@ import sharp from "sharp";
 import { withBase } from "./basePath";
 import { detectFormat, type FrameFormat } from "./frames";
 import { uploadDir } from "./images";
+import { parseExifDate, parseIso6709 } from "./v2/media";
 
 const run = promisify(execFile);
 
@@ -28,7 +29,32 @@ export type VideoResult = {
   imageUrl: string;
   thumbUrl: string;
   aspect: FrameFormat;
+  /** poster size (v2 picks the tall/wide film template from it) */
+  width: number;
+  height: number;
+  /** read from the source before metadata is stripped */
+  takenAt: string | null;
+  lat: number | null;
+  lng: number | null;
 };
+
+/** Capture time and place from the source container (QuickTime / MP4 tags). */
+async function probeSource(file: string): Promise<{ takenAt: string | null; lat: number | null; lng: number | null }> {
+  try {
+    const { stdout } = await run("ffprobe", ["-v", "quiet", "-print_format", "json", "-show_format", file], {
+      timeout: 30_000,
+      maxBuffer: 1 << 22,
+    });
+    const tags: Record<string, string> = JSON.parse(stdout)?.format?.tags ?? {};
+    const lower = Object.fromEntries(Object.entries(tags).map(([k, v]) => [k.toLowerCase(), v]));
+    const taken = parseExifDate(lower["com.apple.quicktime.creationdate"] ?? lower["creation_time"]);
+    const where = parseIso6709(lower["com.apple.quicktime.location.iso6709"] ?? lower["location"]);
+    return { takenAt: taken ? taken.toISOString() : null, lat: where?.lat ?? null, lng: where?.lng ?? null };
+  } catch {
+    // ffprobe missing or unreadable tags: the video still uploads
+    return { takenAt: null, lat: null, lng: null };
+  }
+}
 
 /**
  * §6 video pipeline. iPhone clips are usually HEVC in a .mov container, which
@@ -49,6 +75,7 @@ export async function processVideoUpload(input: Buffer): Promise<VideoResult> {
 
   try {
     await writeFile(src, input);
+    const probed = await probeSource(src);
 
     await run(
       "ffmpeg",
@@ -101,11 +128,15 @@ export async function processVideoUpload(input: Buffer): Promise<VideoResult> {
     await writeFile(path.join(dir, `${id}.webp`), main);
     await writeFile(path.join(dir, `${id}.thumb.webp`), thumb);
 
+    const stored = await sharp(main).metadata();
     return {
       videoUrl: withBase(`/api/media/${id}.mp4`),
       imageUrl: withBase(`/api/media/${id}.webp`),
       thumbUrl: withBase(`/api/media/${id}.thumb.webp`),
       aspect,
+      width: stored.width ?? posterMeta.width ?? 0,
+      height: stored.height ?? posterMeta.height ?? 0,
+      ...probed,
     };
   } finally {
     await rm(work, { recursive: true, force: true });
