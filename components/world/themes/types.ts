@@ -13,16 +13,24 @@ export type Sticker = { name: string; draw: () => React.ReactNode };
 
 export type Mount = "bow" | "kraft" | "corners" | "stripes" | "dots";
 
+/**
+ * What a kit draws for one layer slice. `bands` are continuous shapes the
+ * caller clips to the slice's exact range (they are built on a global grid,
+ * so neighbouring slices meet seamlessly); `items` are free-standing pieces
+ * owned by the slice that contains their x and never clipped.
+ */
+export type LayerArt = { bands?: React.ReactNode; items?: React.ReactNode };
+
 export type ThemeKit = {
   key: ThemeKey;
   /** far layer: sun / moon / stars / clouds */
-  sky(span: Span): React.ReactNode;
+  sky(span: Span): LayerArt;
   /** mid layer: hills, mountains, city, sea */
-  mid(span: Span): React.ReactNode;
+  mid(span: Span): LayerArt;
   /** ground bands from y≈560 down to 720 */
-  ground(span: Span): React.ReactNode;
+  ground(span: Span): LayerArt;
   /** deepest front band plus tiny ground stickers */
-  front(span: Span): React.ReactNode;
+  front(span: Span): LayerArt;
   stickers: Record<AnchorKind, Sticker[]>;
   mount: Mount;
 };
