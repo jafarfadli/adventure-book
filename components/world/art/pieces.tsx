@@ -12,7 +12,7 @@ export function at({ x, y, s = 1, r = 0 }: Place): string {
 
 function G({ p, children }: { p: Place; children: React.ReactNode }) {
   return (
-    <g transform={at(p)} fill={p.fill} filter={p.shadow === false ? undefined : LIFT} opacity={p.opacity}>
+    <g transform={at(p)} style={{ fill: p.fill }} filter={p.shadow === false ? undefined : LIFT} opacity={p.opacity}>
       {children}
     </g>
   );
@@ -42,7 +42,7 @@ export function Star5(p: Place) {
     <G p={{ fill: "var(--accent)", ...p }}>
       <path
         d="M0 -24 L5.9 -8.1 L22.8 -7.4 L9.5 3.1 L14.1 19.4 L0 10 L-14.1 19.4 L-9.5 3.1 L-22.8 -7.4 L-5.9 -8.1Z"
-        stroke={p.fill ?? "var(--accent)"}
+        style={{ stroke: p.fill ?? "var(--accent)" }}
         strokeWidth={4}
         strokeLinejoin="round"
       />
@@ -79,9 +79,9 @@ export function Sun(p: Place & { radius?: number }) {
 export function Bush({ x, y, left, right, deep }: { x: number; y: number; left: string; right: string; deep: string }) {
   return (
     <g filter={LIFT}>
-      <circle cx={x - 46} cy={y + 10} r={40} fill={left} />
-      <circle cx={x} cy={y - 12} r={54} fill={right} />
-      <circle cx={x + 50} cy={y + 8} r={42} fill={deep} />
+      <circle cx={x - 46} cy={y + 10} r={40} style={{ fill: left }} />
+      <circle cx={x} cy={y - 12} r={54} style={{ fill: right }} />
+      <circle cx={x + 50} cy={y + 8} r={42} style={{ fill: deep }} />
     </g>
   );
 }
