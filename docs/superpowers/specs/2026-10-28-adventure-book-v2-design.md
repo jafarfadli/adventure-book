@@ -59,6 +59,7 @@ Decided by the implementer (delegated):
 | I9 | Month signposts are generated automatically when the month changes between consecutive stops. | Gives the long canvas a timeline without any manual work. |
 | I10 | Irreversible cleanup (dropping legacy columns, deleting the old COVER/CLOSING pages) is **not** executed until the user confirms after returning. Everything else in Phase 6 (switch, redirects, removing old UI code) is done. | Destructive data changes need explicit approval; leaving the columns is harmless. |
 | I11 | Tests: Vitest for pure logic, Playwright (system Chrome, no browser download) for E2E and visual snapshots against the dev server + dev DB. | The repo has no tests today; the redesign is too large to verify by eye only. |
+| I12 | At the switch the v1 UI code stays in the tree (unused while the flag is on); removing it is a one-commit follow-up after the couple have used v2. | Keeps rollback instant (env + restart) while the user is away; code removal is reversible but rebuilding is not instant. |
 
 ## 3. Visual language
 
@@ -382,7 +383,7 @@ with `?v=2` → set `ADVENTURE_V2=1` → restart → verify. **Rollback:** unset
 | 3 Editor | In-place editing as §8 on phone and desktop sizes; autosave, undo, reorder, template/theme/seed, focus, date, location, book settings; parity test passes; legacy `layout` kept in sync. |
 | 4 Add many photos | Upload metadata extended; grouping + review + one-transaction create; E2E passes. |
 | 5 Shelf | Shelf model + migration, shelf page, create book, shelf password, shelf-level map and wishlist with redirects. |
-| 6 Switch | Merged, released, flag on, verified; v1 UI code and `react-pageflip` removed; `CLAUDE.md` rewritten for v2; deferred destructive cleanup documented for the user. |
+| 6 Switch | Merged, released, flag on, verified; `CLAUDE.md` rewritten for v2; v1 UI code removal and the deferred destructive cleanup documented for the user (I10, I12). |
 
 ## 16. Non-goals
 

@@ -1,5 +1,11 @@
 import { defineConfig } from "@playwright/test";
 
+const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3012";
+// the suites edit, create and delete what they test against: never the live app
+if (/:3002\b|\.ts\.net/.test(baseURL)) {
+  throw new Error(`E2E_BASE_URL ${baseURL} is the live app; run against the v2 dev server on :3012`);
+}
+
 // Runs against the v2 dev server (`next dev -p 3012`), which points at the
 // adventure_book_v2dev copy — never at the live database. Uses the system
 // Chrome so no browser download is needed.
@@ -12,7 +18,7 @@ export default defineConfig({
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.01, animations: "disabled" } },
   use: {
     channel: "chrome",
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3012",
+    baseURL,
   },
   projects: [
     { name: "setup", testMatch: /auth\.setup\.ts/, use: { viewport: { width: 1440, height: 900 } } },

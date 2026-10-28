@@ -1,434 +1,353 @@
 # CLAUDE.md — Adventure Book
 
-A romantic, interactive "scrapbook" web app for capturing dating memories. Public to read, editable only by the couple behind a shared password. Photos live in template-based page layouts with hand-written captions, polaroid framing, and a gentle page-turn feel.
+A romantic, interactive scrapbook of a couple's dates. Since v2 it is a **shelf of books**, and each
+book is **one continuous, horizontally scrolling paper diorama**: every page is a *stop* along a dotted
+path through a layered paper-cut landscape that changes with each stop's theme. Public to read;
+editable only by the couple, with one shared password, directly inside the book.
 
-> **Target UI language:** Bahasa Indonesia (copy, buttons, labels). Code, comments, and this spec stay in English.
+> **UI language:** Bahasa Indonesia, casual, as short as possible. Code, comments and docs: English.
+>
+> **Design record:** `docs/superpowers/specs/2026-10-28-adventure-book-v2-design.md` (decisions and
+> rationale). This file is the operative summary; the code named here is the source of truth.
 
 ---
 
-## 1. Product overview
+## 1. Product
 
-- A single **Book** is a sequence of **Pages**. Each Page uses one of a fixed set of **layout templates** (no free drag-drop). A layout defines a set of **Slots** — each slot holds either a photo (+ caption) or a text block.
-- **Readers** (public) open `/book/[slug]` and flip through pages. Read-only, no login.
-- **Editors** (the couple) unlock editing with the book's password, then add/reorder/delete pages, choose layouts, upload photos, and write captions.
-- Vibe: warm cream paper, hand-written fonts, slightly-tilted polaroids, washi tape, date stamps. Casual and personal, never "corporate app".
+- **Shelf** (`/`): the couple's books stand face-out on a paper shelf. Editors get a ghost book with ＋
+  to start the next volume (title + theme). A book with no stops can be deleted from its settings.
+- **Book = one world** (`/book/[slug]`):
+  - **Cover overlay**: felt board, stitched spine, die-cut window showing the cover photo. Shown once
+    per session per book (`sessionStorage ab-opened:<slug>`), skipped for deep links.
+  - **Start sign**: title, `vol. N`, the date it began.
+  - **Stops**: one per `Page`, in `Page.order`. Each stop has a template (fixed frames) and a theme
+    (palette + asset kit). Decorations are placed automatically; the dice reshuffles them.
+  - **Month signposts**: inserted automatically wherever the month changes between dated stops.
+  - **End**: a "bersambung" sign with stats (`N halaman · M kenangan`, date range) and the closing
+    text, up to three open wishes as signposts, and a back cover.
+- **Readers** need no login. **Editors** unlock once per shelf and edit in place (§6).
+- Companions: `/map` (where photos and videos were taken) and `/wishlist` (things to do together).
 
-Non-goals for v1: multi-user accounts, comments, free-canvas positioning, real-time collab.
+Non-goals: free-canvas positioning, per-sticker placement, user accounts, comments, real-time
+collaboration, offline mode, PDF export, a 3D page flip.
 
 ---
 
 ## 2. Tech stack
 
-- **Next.js 15** (App Router, Server Actions, Route Handlers)
-- **React 19**, TypeScript (strict)
-- **Prisma** ORM + **PostgreSQL** (Homebrew local on the Mac mini)
-- **Tailwind CSS** for styling
-- **sharp** for image resize/compression
-- **jose** for signing the editor session JWT; **bcryptjs** for the password hash
-- **framer-motion** for page transitions (start simple; 3D flip later)
-- Fonts via `next/font` + Google Fonts: **Caveat** and **Kalam** (hand-written), plus one clean sans for UI chrome.
-- Deploy: **PM2** + **Tailscale Funnel** on **Mac mini M4** (16GB). No cloud object storage — files on local disk.
+- **Next.js 15** (App Router, Server Actions, Route Handlers), **React 19**, TypeScript strict
+- **Prisma 6** + **PostgreSQL** (Homebrew, local on the Mac mini)
+- **Tailwind CSS 4**; fonts via `next/font`: **Caveat** (captions, titles, stamps), **Kalam**
+  (stories, letters), **Inter** only for UI chrome
+- **sharp** (images), **exifr** (EXIF GPS + capture time), **ffmpeg/ffprobe** (video, Homebrew)
+- **jose** (session JWT), **bcryptjs** (password hash), **zod** (every input)
+- **leaflet** + **react-leaflet** (map), **@dnd-kit** (reordering stops)
+- **Vitest** (pure logic), **Playwright** with the system Chrome (E2E, visual, parity)
+- v1-only, kept with the v1 code until it is removed (§10): `framer-motion`, `react-pageflip`
+- Deploy: **PM2** + Caddy gateway + **Tailscale Funnel** on a **Mac mini M4** (§14). Media on local
+  disk, no cloud storage.
 
 ---
 
-## 3. Domain model (Prisma)
+## 3. Domain model
 
-```prisma
-// schema.prisma
+`prisma/schema.prisma` is the source of truth. Migrations are **additive only**.
 
-model Book {
-  id               String   @id @default(cuid())
-  slug             String   @unique            // public URL segment, e.g. "our-story"
-  title            String
-  subtitle         String?
-  theme            String   @default("cream")  // theme preset key (see §7)
-  coverImageUrl    String?
-  editPasswordHash String                       // bcrypt hash; plaintext known only to editors
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  pages            Page[]
-  wishlist         WishlistItem[]
-}
+- **Shelf**: `title`, `editPasswordHash` (the one password), books, wishlist.
+- **Book**: `slug`, `title`, `subtitle`, `theme` (v2 theme key; legacy values are mapped), `volume`,
+  `shelfId`, `shelfOrder`, cover (`coverImageUrl`, `coverFocusX/Y`, `coverText`), `closingText`.
+- **Page** (a stop): `order` (contiguous, 0-based), `template` (v2 key; null = derived), `theme`
+  (null = follows the book), `decorSeed`, plus the legacy `layout` enum.
+- **Slot**: `key` (`photo1..3`, `video1`, `text1`), `type`, media (`imageUrl`, `thumbUrl`, `videoUrl`,
+  `width`, `height`), crop focus (`focusX/Y`, 0..1), `caption`, `text`, dates (`takenAt` from the file,
+  `dateLabel` written by the couple, `showDate`), location (`lat`, `lng`, `locationLabel`,
+  `locationSource` = `"exif" | "manual"`).
+- **WishlistItem**: `text`, `done`, `doneAt`, `order`, `shelfId` (v2) and `bookId` (v1; v2 files new
+  wishes under the shelf's first book too).
 
-model WishlistItem {
-  id        String   @id @default(cuid())
-  bookId    String
-  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  text      String                              // the activity, text only (no photos)
-  done      Boolean  @default(false)            // checked = struck through
-  doneAt    DateTime?                            // optional: when it was completed
-  order     Int                                 // 0-based ordering within the list
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+Rules the code relies on:
 
-  @@index([bookId])
-}
-
-model Page {
-  id        String   @id @default(cuid())
-  bookId    String
-  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  order     Int                                 // 0-based position within the book
-  layout    Layout   @default(SINGLE)
-  bgStyle   String?                             // optional per-page paper override
-  slots     Slot[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([bookId, order])
-  @@index([bookId])
-}
-
-model Slot {
-  id        String   @id @default(cuid())
-  pageId    String
-  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  key       String                              // slot id within the layout, e.g. "photo1", "text1"
-  type      SlotType
-  imageUrl  String?                             // PHOTO: processed image path · VIDEO: poster frame path
-  thumbUrl  String?                             // PHOTO/VIDEO: small thumbnail / poster thumb
-  videoUrl  String?                             // VIDEO: transcoded web-safe MP4 (H.264/AAC) path
-  aspect    String?                             // PHOTO/VIDEO frame format: "portrait" | "square" | "landscape" (null = square)
-  caption   String?                             // PHOTO: hand-written caption under the photo
-  text      String?                             // TEXT: the note/letter/quote body
-  rotation  Float    @default(0)                // decorative tilt in degrees (approx -6..6)
-  tapeStyle String?                             // decorative tape/sticker preset key, nullable
-  dateLabel String?                             // optional hand-written date stamp
-  lat       Float?                              // PHOTO: decimal latitude (from EXIF GPS or set manually)
-  lng       Float?                              // PHOTO: decimal longitude
-  locationLabel String?                         // optional human label, e.g. "Bandung"
-  locationSource String?                        // "exif" | "manual" — how lat/lng was set (null if unset)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([pageId, key])
-  @@index([pageId])
-}
-
-enum Layout {
-  COVER        // title + subtitle + optional hero photo
-  SINGLE       // 1 photo + caption
-  DUO          // 2 photos side by side + captions
-  TRIO         // 3-photo collage
-  PHOTO_TEXT   // 1 photo + a longer note beside it
-  DUO_TEXT     // 2 photos + a story
-  TRIO_TEXT    // 3 photos + a story
-  VIDEO        // 1 video in a film-strip frame + caption
-  TEXT         // full-page note / letter
-  QUOTE        // centered milestone quote
-  CLOSING      // "to be continued" style ending
-}
-
-enum SlotType {
-  PHOTO
-  TEXT
-  VIDEO
-}
-```
-
-**Slot contract per layout** — define this in `lib/layouts.ts` as the single source of truth. Both the editor (which slots to render as inputs) and the reader (how to place them) read from it:
-
-```ts
-// lib/layouts.ts
-export type SlotSpec = { key: string; type: "PHOTO" | "TEXT" | "VIDEO"; label: string };
-
-export const LAYOUTS: Record<Layout, { label: string; slots: SlotSpec[] }> = {
-  COVER:      { label: "Sampul",        slots: [{ key: "photo1", type: "PHOTO", label: "Foto sampul" }, { key: "text1", type: "TEXT", label: "Judul / kutipan" }] },
-  SINGLE:     { label: "Satu foto",     slots: [{ key: "photo1", type: "PHOTO", label: "Foto" }] },
-  DUO:        { label: "Dua foto",      slots: [{ key: "photo1", type: "PHOTO", label: "Foto kiri" }, { key: "photo2", type: "PHOTO", label: "Foto kanan" }] },
-  TRIO:       { label: "Kolase tiga",   slots: [{ key: "photo1", type: "PHOTO", label: "Foto 1" }, { key: "photo2", type: "PHOTO", label: "Foto 2" }, { key: "photo3", type: "PHOTO", label: "Foto 3" }] },
-  PHOTO_TEXT: { label: "Foto + cerita", slots: [{ key: "photo1", type: "PHOTO", label: "Foto" }, { key: "text1", type: "TEXT", label: "Cerita" }] },
-  DUO_TEXT:   { label: "Dua foto + cerita", slots: [{ key: "photo1", type: "PHOTO", label: "Foto kiri" }, { key: "photo2", type: "PHOTO", label: "Foto kanan" }, { key: "text1", type: "TEXT", label: "Cerita" }] },
-  TRIO_TEXT:  { label: "Tiga foto + cerita", slots: [{ key: "photo1", type: "PHOTO", label: "Foto 1" }, { key: "photo2", type: "PHOTO", label: "Foto 2" }, { key: "photo3", type: "PHOTO", label: "Foto 3" }, { key: "text1", type: "TEXT", label: "Cerita" }] },
-  VIDEO:      { label: "Video",         slots: [{ key: "video1", type: "VIDEO", label: "Video" }, { key: "text1", type: "TEXT", label: "Caption" }] },
-  TEXT:       { label: "Surat",         slots: [{ key: "text1", type: "TEXT", label: "Isi surat" }] },
-  QUOTE:      { label: "Kutipan",       slots: [{ key: "text1", type: "TEXT", label: "Kutipan" }] },
-  CLOSING:    { label: "Penutup",       slots: [{ key: "text1", type: "TEXT", label: "Kata penutup" }] },
-};
-```
-
-Guardrail: when the editor switches a page's layout, keep slot data whose `key` still exists in the new layout; drop the rest only after a confirm dialog.
+- Writing a template also writes the matching legacy `layout` (`TEMPLATES[t].legacy`), so the v1 app
+  keeps rendering every page.
+- Switching templates keeps every slot row: slots the new template has no place for are hidden, and
+  come back when switching back. Anything a reader can notice — stats, month signs, map pins — counts
+  only **shown** slots that **have their media**: `visibleSlots()` / `hasMedia()` in
+  `lib/v2/visible.ts`.
+- v1 `COVER`/`CLOSING` pages are not stops; their content was copied into the Book fields above.
+  v2 keeps them at the two ends of the order.
+- `reorderStopsV2` rewrites the whole order in one transaction.
 
 ---
 
-## 4. Access & auth model
+## 4. Templates, themes, decorations
 
-Deliberately lightweight — no user table, no OAuth.
+All geometry is in **design units (u)**: every stop is 720u tall and `TEMPLATES[t].width` wide; the
+ground band starts near 560u and the path runs at 642u.
 
-- Each Book stores `editPasswordHash` (bcrypt). Plaintext is set at seed time / via an admin script, and shared privately between the couple.
-- **Unlock flow:** `/book/[slug]/unlock` → user submits password → `POST /api/session` verifies against `editPasswordHash` → on success, set an **httpOnly, Secure, SameSite=Lax** cookie `ab_session` containing a `jose`-signed JWT `{ bookId, role: "editor", exp }` (~30 days).
-- **Guard:** `lib/auth.ts` exports `requireEditor(bookId)` — reads and verifies the cookie, throws/redirects if invalid or `bookId` mismatch. Every mutating Server Action and the upload route calls it **first**, before touching the DB or disk.
-- Public read routes never check auth.
-- Add a signed-in "Selesai edit" button that clears the cookie.
+- **`lib/v2/templates.ts`** — the 12 templates (frames with ratio, window size, card position and
+  fixed rotation; text box; decoration anchors; date-stamp anchor; picker glyph), plus
+  `slotSpecs()`, `deriveTemplate()` (legacy layout + real photo shape → template) and
+  `resolveTemplate()`.
 
-```ts
-// env
-SESSION_SECRET=        // long random string for jose HS256
-```
+  | key | label | legacy |
+  |---|---|---|
+  | `single-tall` / `single-wide` | Satu foto tegak / lebar | SINGLE |
+  | `duo-side` / `duo-stack` | Dua foto berdampingan / bertumpuk | DUO |
+  | `trio` | Tiga foto | TRIO |
+  | `photo-text` | Foto + cerita | PHOTO_TEXT |
+  | `duo-text` | Dua foto + cerita | DUO_TEXT |
+  | `strip-text` | Strip photobooth + cerita | TRIO_TEXT |
+  | `video-tall` / `video-wide` | Video tegak / lebar | VIDEO |
+  | `letter` | Surat | TEXT |
+  | `quote` | Kutipan | QUOTE |
 
-Rate-limit `POST /api/session` (e.g. simple in-memory token bucket per IP, 5 tries / 5 min) to slow brute force. Never reveal whether the slug exists on a wrong password.
-
----
-
-## 5. Routes
-
-**Pages (App Router)**
-- `/` — landing. For v1 with a single book, redirect to `/book/[DEFAULT_SLUG]`.
-- `/book/[slug]` — public reader. Fetches Book + Pages + Slots (ordered), renders the flip experience. Fully static-friendly / cacheable.
-- `/book/[slug]/unlock` — password form.
-- `/book/[slug]/edit` — editor shell (guarded by `requireEditor`; redirect to `/unlock` if not authorized).
-- `/book/[slug]/map` — **memory map** (see §7.5). Public, read-only. Renders a pin per geotagged photo; ignores photos without coordinates.
-- `/book/[slug]/wishlist` — **shared wishlist** (see §7.6). Public read-only; add/toggle/delete are editor-only.
-
-**Route Handlers**
-- `POST /api/session` — verify password, set cookie.
-- `DELETE /api/session` — clear cookie.
-- `POST /api/upload` — multipart image **or video** upload (editor-only). Images → `{ imageUrl, thumbUrl, lat?, lng? }`; videos → `{ videoUrl, imageUrl (poster), thumbUrl }` (see §6).
-- `GET /api/media/[...path]` — streams a stored file from `UPLOAD_DIR` with long-lived cache headers. (Files live outside `/public`, so serve them through here.) **Must support HTTP range requests** (`Accept-Ranges: bytes`, `206 Partial Content`) — required for video seeking and mobile playback. Serving video as a single full-body response breaks scrubbing and often won't play on iOS.
-
-**Server Actions** (mutations, all call `requireEditor` first)
-- `createPage(bookId, layout)`, `deletePage(pageId)`, `reorderPages(bookId, orderedIds[])`
-- `setPageLayout(pageId, layout)`
-- `upsertSlot(pageId, key, data)` — write caption/text/imageUrl/rotation/tape/date for a slot
-- `setSlotLocation(slotId, { lat, lng, source, label })`, `clearSlotLocation(slotId)`
-- `updateBookMeta(bookId, { title, subtitle, theme, coverImageUrl })`
-- `addWishlistItem(bookId, text)`, `toggleWishlistItem(id)`, `deleteWishlistItem(id)`, `reorderWishlist(bookId, orderedIds[])`
+- **The template decides the frame shape**; photos are cropped (`object-fit: cover`) at the slot's
+  focus point. There are no per-photo formats, tilt sliders or tape pickers in v2. Notes and letters
+  clamp to their line limits; captions are one line.
+- **`lib/v2/themes.ts`** — five themes, each four analogous shades plus one accent: `stroberi`
+  (romantis), `senja` (jalan-jalan), `matcha` (kafe & makan), `laut` (liburan), `lavender` (malam).
+  Legacy keys map `cream → stroberi`, `dusk → lavender`, `kraft → senja`. `themeCssVars()` exposes
+  the tokens as CSS variables.
+- **`components/world/themes/<key>.tsx`** — each theme's kit: sky / mid / ground / front layer art,
+  sticker pools per anchor kind (`sky`, `side`, `ground`) and how photos are mounted (bow, kraft tape,
+  corner tapes, striped tape, dotted tape). All hand-authored SVG.
+- **`lib/v2/decor.ts`** — `placeDecorations(anchors, pools, pageId, decorSeed)`: a seeded choice per
+  anchor (about 30% left empty, small jitter). Same inputs, same page, always. Anything random in the
+  art goes through `lib/v2/rng.ts`, seeded by ids.
+- In SVG, put theme colours in `style` (`style={{ fill: "var(--c3)" }}`); `var()` in presentation
+  attributes is not reliable.
 
 ---
 
-## 6. Image upload pipeline
+## 5. World renderer (`components/world/`)
 
-In `POST /api/upload`:
-1. `requireEditor` — reject anonymous.
-2. Validate: mime in `image/jpeg|png|webp|heic`, size ≤ ~12MB pre-process. Reject otherwise.
-3. **Extract geotag first (before re-encoding strips it).** Read EXIF GPS with `exifr` (`import exifr from "exifr"`): `const { latitude, longitude } = await exifr.gps(buffer) ?? {}`. `exifr` returns decimal degrees directly. If absent or malformed, treat as no geotag (`lat/lng = null`) — never fail the upload over a missing tag. Return `{ lat, lng }` alongside the image paths so the caller can persist them onto the slot.
-4. Process with **sharp**:
-   - Main: `rotate()` (bake in EXIF orientation) → resize to max **1600px** on the long edge (no upscale) → **webp** quality ~82.
-   - Thumb: resize to **400px** long edge → webp quality ~70.
-5. Write both to `UPLOAD_DIR` (env, a **persistent** path outside `.next`, e.g. `~/adventure-book/uploads`). Filenames = `${cuid}.webp` / `${cuid}.thumb.webp`.
-6. **Strip metadata** (sharp drops it by default when re-encoding — never call `.withMetadata()`). The served file carries no GPS/EXIF; the coordinates now live only in the DB, where *you* control them. This is the whole point: the map works, but the public file leaks nothing.
-7. Return the public paths (served via `/api/media/...`) plus `{ lat, lng }`.
+**One renderer** draws the reader, the editor, the all-pages tiles and the dev gallery
+(`WorldCanvas`, `StationScene`, `Station`, `items/*`). The editor only adds overlays, which is what
+keeps the preview identical to the reader; `e2e/parity.spec.ts` compares the pixels.
 
-Never trust the original filename. Never store absolute disk paths in the DB — store the media route path (e.g. `/api/media/<cuid>.webp`). The `upsertSlot` action writes `lat`/`lng` (and optional `locationLabel`) when the upload returns them.
-
-### Video processing (VIDEO slots)
-
-Video is **not** "a photo that moves" — it needs a different pipeline (`ffmpeg`, not `sharp`) and has real gotchas. Install `ffmpeg` via Homebrew; on the M4 use hardware encoding (`h264_videotoolbox`) for speed.
-
-1. `requireEditor`. Validate mime in `video/mp4|quicktime|webm`, size ≤ ~200MB pre-process (tune to taste). Reject otherwise.
-2. **Extract location first (optional, for the map).** iPhone `.mov` stores GPS in a QuickTime metadata atom. If you want videos to contribute map pins, read it (e.g. `ffprobe`/`exiftool`) before stripping, and persist `lat`/`lng` like photos.
-3. **Transcode to a web-safe MP4** — iPhone video is often HEVC/H.265 in `.mov`, which most browsers can't play. Convert to H.264 + AAC:
-   ```
-   ffmpeg -i input.mov -map_metadata -1 \
-     -c:v h264_videotoolbox -b:v 4M -vf "scale='min(1280,iw)':-2" \
-     -c:a aac -b:a 128k -movflags +faststart output.mp4
-   ```
-   - `-map_metadata -1` strips all metadata (incl. GPS) — required, the book is public.
-   - `-movflags +faststart` moves the index to the front so the video starts playing before it's fully downloaded (streaming).
-   - Cap resolution (e.g. 1280px) and bitrate to keep files reasonable.
-4. **Extract a poster frame** for the film-strip thumbnail (shown before play):
-   ```
-   ffmpeg -i output.mp4 -ss 00:00:01 -frames:v 1 poster.jpg
-   ```
-   Run it through `sharp` to make webp `imageUrl` + `thumbUrl` (reuse the image path fields; for a VIDEO slot, `imageUrl` = poster).
-5. Write `${cuid}.mp4` + poster to `UPLOAD_DIR`. Return `{ videoUrl, imageUrl (poster), thumbUrl, lat?, lng? }`.
-6. **Async caveat:** transcoding a short clip takes seconds to tens of seconds, unlike near-instant image resize. For short clips, blocking the request with a progress indicator is acceptable; for anything longer, run transcode as a background job and poll a status field. Don't leave the editor staring at a frozen spinner with no feedback.
-
-Served video **requires HTTP range support** in `/api/media` (§5) — without it, seeking breaks and iOS often won't play at all.
+- **Scale**: `s = min(viewportHeight / 720, viewportWidth / 460)` px per u (`lib/v2/scale.ts`),
+  exposed as `--u`.
+- **Layout** (`lib/v2/world.ts`, pure and unit-tested): start (420u) · stops · month signs (180u) ·
+  end (880u), with 90u gaps. Every segment owns one scenery slice; slices tile the world exactly, and a
+  theme change always falls in a gap. The sky colour crossfades over ±260u.
+- **Layers and parallax**: sky 0.22, mid 0.55, ground 1, front 1.16, written by one
+  rAF-throttled scroll handler. Slice art is drawn on a global grid (`lib/v2/shapes.ts`) so
+  neighbouring slices meet without a seam; clips overlap by 0.75u. Slices use
+  `content-visibility: auto` with padded boxes (paint containment clips anything that overhangs).
+- **Navigation**: native horizontal scroll (momentum, no snap); a vertical wheel scrolls sideways on
+  desktop; ←/→ jump stop to stop; a timeline strip with a dot per stop. Deep links `?p=<pageId>` and
+  `?page=<order>` start at that stop and skip the cover.
+- **Chrome** (icons only): shelf, map, wishlist, share (the shared link drops the `v` parameter),
+  music toggle (`public/audio/paper-lanterns.mp3`), pencil to edit.
+- **Video stops**: poster + play icon; tap plays inline (`playsInline`, `preload="none"`); paused when
+  scrolled away.
+- **Motion and a11y**: with `prefers-reduced-motion` every parallax factor is 1 and transitions are
+  instant. The world is a labelled scroll region; each stop is `section[data-page]` labelled
+  `Halaman N`; photo `alt` = caption or `foto kenangan`.
 
 ---
 
-## 7. Design direction
+## 6. Editor (`components/editor-v2/`)
 
-The scrapbook feel is the product. Details that matter:
+`/book/[slug]/edit` renders the same world with edit overlays (`EditorWorld`).
 
-- **Paper:** warm cream base (`#efe6d3`-ish), subtle center gutter shadow on the two-page spread. Theme presets keyed by `Book.theme`: `cream`, `dusk` (muted lavender), `kraft` (brown paper). Keep to 2–3 for v1.
-- **Fonts:** Caveat / Kalam for captions, notes, and date stamps; a clean sans (Inter or similar) only for UI chrome (buttons, editor controls).
-- **Photos:** render as polaroids — white frame, drop shadow, small `rotation` tilt from the slot, optional washi-tape corner via `tapeStyle`. Captions in Caveat under the frame.
-- **Video (film-strip frame):** render VIDEO slots inside a simple "film paper" frame — a dark film border with evenly-spaced sprocket holes down both sides, the video in the middle, a slight tilt to match the polaroids, handwritten caption below. Show the `imageUrl` poster with a play button by default; load/play the `videoUrl` only on interaction (don't autoplay every clip). Use `<video playsInline preload="none" poster={imageUrl}>` — `playsInline` is essential so iOS plays inline instead of hijacking fullscreen. Keep controls minimal; optional muted-loop for very short clips.
-- **Frame formats:** every PHOTO/VIDEO slot picks one of three shapes via `Slot.aspect` — **portrait 2:3**, **square 1:1**, **landscape 3:2** (null reads as square). Defined once in `lib/frames.ts` and shared by both frames and the editor picker. Layouts pass a `size` from the named `FRAME_SIZE` scale (`hero` · `cover` · `pair` · `pairStory` · `trio` · `trioStory` · `film`) plus a `maxHeight` ceiling — they never invent pixel values. `size` is an **optical** size, not a width or a height: `frameBox()` lays every format out to cover the same area (`size²`), so a portrait photo reads as carrying the same weight as a landscape one. Sizing by equal *height* instead makes portrait frames two-thirds the width of a square, and lets landscape frames (1.5× wide) hit the page edge and cap the whole scale — which is what made every portrait and square photo look shrunken. Portrait is the tallest shape, so `maxHeight` is what keeps a stack of three inside a fixed-height page; when the cap bites the frame shrinks along its own ratio rather than being squashed. Uploads pre-select the format from the media's own dimensions (orientation-corrected for photos, from the poster frame for video); the editor can override it. Frame chrome follows the shape too: portrait polaroids get a thinner border, and landscape film strips move their sprocket holes to the top and bottom edges.
-- **Motion:** reader page transition = fade + slight horizontal slide (framer-motion), ~350ms. Respect `prefers-reduced-motion` (cut to instant). Save the 3D page-flip for Phase 5.
-- **Responsive:** mobile-first. On narrow screens, collapse the two-page spread into a single stacked page per view; keep swipe left/right to navigate.
-- **A11y:** every photo slot needs meaningful `alt` (fall back to caption or "foto kenangan"). Keyboard nav (←/→) for pages. Focus-visible states on editor controls.
-
-Reference the couple's real copy tone: casual, warm, first-person, emoji sparingly. Don't over-design the chrome — the page content should feel handmade, the editor UI should feel quiet and out of the way.
-
----
-
-## 7.5 Memory map (`/book/[slug]/map`)
-
-A map showing where each geotagged photo was taken. Public, read-only. Ties the whole book together spatially.
-
-**Stack:** `leaflet` + `react-leaflet`. Tiles: **Stamen Watercolor via Stadia Maps** — a hand-painted, paper-textured raster style that matches the scrapbook aesthetic. Set `maxZoom: 16` (the watercolor set thins out above 16 and shows gaps). Keep the required attribution visible: © Stadia Maps, © Stamen Design, © OpenStreetMap.
-
-```
-Tile URL: https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg
-```
-
-**Data:** query all PHOTO slots in the book where `lat` and `lng` are non-null, selecting `lat, lng, thumbUrl, caption, locationLabel` and the parent `page.order` + `book.slug`. Slots without coordinates are excluded here — that *is* the "ignore photos without geotag" handler; no marker is ever created for them.
-
-**Markers:** custom `L.divIcon` styled as a mini polaroid — the photo's `thumbUrl` in a small white frame with a slight tilt, matching the reader's polaroid look. Not the default Leaflet pin.
-
-**Behaviour:**
-- **Auto-fit on load.** `map.fitBounds(bounds, { padding: [48, 48] })` over all markers. Handle the edge cases explicitly:
-  - **1 marker** → `fitBounds` over-zooms; instead `setView([lat, lng], 13)`.
-  - **0 markers** → don't render an empty floating map; show an empty state ("Belum ada foto dengan lokasi 📍") with a link back to the book.
-- **Hover** a marker → popup/tooltip with a larger thumbnail + caption (`bindTooltip` or a controlled popup). On touch devices, tap shows the preview.
-- **Click** a marker → navigate to the reader at that photo's page, e.g. `router.push(withBase(`/book/${slug}?page=${page.order}`))`. The reader reads `?page=` and opens directly to that spread.
-- **Many/clustered pins** → optional `leaflet.markercluster` so dense areas (e.g. lots of photos in one city) stay legible. Nice-to-have, not required for v1.
-- Respect `prefers-reduced-motion`: skip `flyTo` animations, jump directly.
-- Add a small "🗺️ Peta" entry point from the reader chrome.
-
-**Keys/attribution:** tiles load client-side. Stadia authorizes the `localhost` referer without a key but returns **401 from any other host** — so for the public Funnel host, register a free Stadia account and use a **domain-restricted** API key — safe to expose as `NEXT_PUBLIC_STADIA_API_KEY` since it's locked to your hostname. **Fallback:** when the key is empty, `lib/mapTiles.ts` serves standard OSM tiles (`tile.openstreetmap.org`) instead so the map never breaks — plainer look, same behaviour. Keep attribution controls enabled (it's a licence requirement, not optional chrome).
-
-**Manual location (editor).** Not every photo has a geotag — screenshots, images sent over WhatsApp (strips EXIF), or shots taken with location services off arrive with no coordinates. So each PHOTO slot in the editor gets a **"📍 Lokasi"** control:
-- If the slot already has `lat`/`lng` (from EXIF or a previous manual set), show it on a small map with the pin, plus a "Ubah" and "Hapus lokasi" action.
-- If it has none, show "Set lokasi manual" → opens a small Leaflet picker (same watercolor tiles). Click to drop a pin, drag to fine-tune, "Simpan" writes `lat`/`lng` with `locationSource = "manual"`.
-- "Hapus lokasi" clears `lat`/`lng`/`locationSource` back to null (removes the pin from the map).
-- Precedence: EXIF is written at upload; a manual set overwrites it and flips `locationSource` to `"manual"`. Never silently overwrite a manual pin with EXIF on re-upload — if a slot is already `manual`, keep it unless the editor explicitly clears it.
-- Optional (nice-to-have): after a manual set, reverse-geocode via OSM **Nominatim** to prefill `locationLabel` (respect its usage policy — 1 req/s, include a proper User-Agent; debounce and cache). Skip for v1 if unsure; a manual text field for `locationLabel` is enough.
-
-This is also the backfill path for photos uploaded before geotag capture existed: open the slot, drop a pin, done.
-
-**Server action:** extend `upsertSlot` (or add `setSlotLocation(slotId, { lat, lng, source, label })` / `clearSlotLocation(slotId)`), guarded by `requireEditor`. Validate `lat ∈ [-90, 90]`, `lng ∈ [-180, 180]` with zod; reject anything else.
+- **Select by tapping**: a stop's empty space selects the stop; a photo selects its slot; a caption or
+  note opens an inline editor exactly over the text (same font, size and width). Esc deselects.
+- **Top bar**: done, undo, save status (saved / saving / warning — tap the warning to retry), all
+  pages (real-render tiles; drag to reorder, tap to jump), book settings (title, vol., cover photo and
+  its focus, cover note, closing text, book theme, delete an empty book).
+- **Dock** (one bar, changes with the selection):
+  - stop: template · page theme ("ikut buku" or one of five) · shuffle decorations · delete
+  - photo / video: replace · focus (drag the photo inside its frame) · caption · date · location · clear
+  - note: write · clear
+- **＋ on the path** in every gap opens the add sheet: many photos/videos at once (uploaded two at a
+  time, grouped per day into suggested stops by `lib/v2/bulk.ts`, reviewed, created in one
+  transaction), or one empty stop by template.
+- **Saving** (`useEditorBook.ts`): every change applies locally at once, goes to the server through
+  one ordered queue, and pushes an inverse on the undo stack. Each queued call reads the **latest**
+  state when it runs, so a retry never writes an older value over a newer one. Failed calls are kept
+  and re-run from the warning button. Deletes are undone by restoring the server's snapshot (same id,
+  same position); undoing a delete that never reached the server simply drops it. Creating stops is
+  never retried automatically (the add sheet keeps its batch).
+- **No confirm dialogs anywhere** — undo instead.
+- **Replace / clear rules**: a new file resets focus, size and `takenAt`; its EXIF location replaces a
+  location that came from EXIF (or clears it). A pin the couple placed by hand (`locationSource =
+  "manual"`) is never changed by a file — enforced in the editor and again in `updateSlotV2`. Clear
+  removes the file and what was read from it, and keeps the manual pin, the place label and the
+  written date.
 
 ---
 
-## 7.6 Shared wishlist (`/book/[slug]/wishlist`)
+## 7. Access and auth
 
-A forward-looking companion to the book: a shared checklist of things the couple wants to do together. Where the book records memories made, the wishlist holds memories to make. Text only — no photos.
-
-**Access model:** public visitors **view** the list read-only (they see each item and whether it's struck through, but checkboxes are disabled). **Editors** (unlocked via password) can add, toggle done/undone, and delete. Same auth as page editing — every mutation goes through a `requireEditor`-guarded Server Action.
-
-**Behaviour:**
-- List of items, each a checkbox + text. Checking an item sets `done = true` and renders the text with a strikethrough; unchecking reverts. Optionally set/clear `doneAt` on toggle to show when it was completed.
-- **Add:** a text input (editor-only) appends a new item to the end (`order = max + 1`). Trim input; ignore empty; cap length (e.g. 200 chars) via zod.
-- **Delete:** editor-only, with a light confirm (or an undo toast).
-- **Reorder:** optional drag handle (editor-only). Not required for v1.
-- Optimistic UI on toggle (flip immediately, reconcile with the action result) so it feels instant.
-- Empty state: a warm prompt like "Belum ada wishlist — tulis hal pertama yang mau kalian lakuin bareng ✨" (editors see the add field; public sees just the message).
-
-**Design:** keep it on-theme — hand-drawn checkboxes, items in the handwritten font (Caveat/Kalam), and a strikethrough that reads like a pen line rather than a hard CSS line-through. Completed items can soften (lower opacity) and optionally show a small `doneAt` date stamp. Add a "✨ Wishlist" entry point in the reader chrome next to the map link.
-
-**Optional extension (not v1):** link a completed item to the book page that documents it (`WishlistItem.pageId?`), so a done wish can say "kelakon! → hal. 7" and jump to that spread — closing the loop between wish and memory.
+- One password per shelf (`Shelf.editPasswordHash`). The shelf took its hash from the original book,
+  so the password did not change; new books copy the shelf's hash.
+- `POST /api/session` `{ slug, password }`: checks the shelf's hash (the book's own if it is on no
+  shelf), then sets `ab_session` — httpOnly, `Secure` in production, `SameSite=Lax`,
+  **`Path=/adventure`**, 30 days — holding a jose HS256 JWT `{ bookId, shelfId?, role: "editor" }`.
+  The same error for a wrong password and an unknown slug. Rate-limited to 5 tries / 5 min per IP
+  (`lib/rate-limit.ts`, in memory). `DELETE /api/session` clears it.
+- `lib/auth.ts`: `canEditBook(bookId)` (the token's book, or any book on the token's shelf),
+  `requireEditor(bookId)`, `requireShelfEditor(shelfId)`, `getEditorShelfId()`. A v1 token (no
+  `shelfId`) counts for its book's shelf only while the shelf's hash equals that book's hash.
+- **Every mutating Server Action and the upload route check first, before any DB or disk side
+  effect.** Public read routes never check auth.
 
 ---
 
-## 8. Build phases
+## 8. Uploads and media
 
-Ship in order; each phase should be runnable.
+`POST /api/upload` (editor only):
 
-- **Phase 0 — Scaffold.** Next.js 15 + TS + Tailwind + Prisma. `schema.prisma` from §3, migrate, and a `prisma/seed.ts` that creates one demo Book (with a bcrypt password from `SEED_EDIT_PASSWORD`) and 3–4 sample pages across different layouts.
-- **Phase 1 — Reader.** `/book/[slug]` renders the ordered pages with polaroid/paper styling and fade-slide navigation. No editing yet. Mobile stacked view + swipe.
-- **Phase 2 — Auth + editor shell.** Unlock flow, `ab_session` cookie, `requireEditor`. `/book/[slug]/edit`: list pages, add page (pick layout from `LAYOUTS`), reorder (drag handle), delete (confirm), edit book title/subtitle/theme.
-- **Phase 3 — Slots + upload.** Per-slot editing driven by `LAYOUTS`: text inputs for TEXT slots, image upload + caption + rotation + date-stamp + tape picker for PHOTO slots. Wire `/api/upload` + sharp. **Extract EXIF GPS with `exifr` at upload and persist `lat`/`lng` onto the slot (§6)** so the map has data later. Live preview mirroring the reader render.
-- **Phase 4 — Polish.** Theme presets, decorative tape/sticker set, empty states, loading/skeletons, error toasts, cover page editing.
-- **Phase 5 — Memory map + manual location.** `/book/[slug]/map` per §7.5: Leaflet + react-leaflet, Stamen Watercolor tiles, polaroid `divIcon` markers, auto-fit with 1/0-marker edge cases, hover-preview, click-to-page. Add the editor's "📍 Lokasi" picker (set / adjust / clear a pin per photo slot) — also the backfill path for older photos with no EXIF. Requires Phase 3. Reader entry point + `?page=` deep-link.
-- **Phase 6 — Nice-to-haves.** Shared wishlist (§7.6: public read-only, editor add/toggle/delete). 3D page-flip (`react-pageflip` / StPageFlip), marker clustering, optional background-music toggle, export-to-PDF, share sheet.
-- **Phase 7 — Video layout.** Add `VIDEO` layout + slot type. Extend `/api/upload` for video: `ffmpeg` transcode to web-safe MP4 (`h264_videotoolbox`, `+faststart`), metadata strip, poster-frame extraction (§6 Video processing). Add HTTP range support to `/api/media` (§5). Film-strip frame renderer in reader + editor preview (§7). Requires the editor/upload flow (Phase 3) and the range-capable media route.
+1. Validate server-side: images `jpeg/png/webp/heic` ≤ 12MB; videos `mp4/quicktime/webm` ≤ 200MB.
+2. **Read metadata before re-encoding strips it**: photos — EXIF GPS (`exifr.gps`) and capture time
+   (`DateTimeOriginal` / `CreateDate`); videos — `ffprobe` `creation_time` and the QuickTime ISO 6709
+   location. Missing or malformed metadata never fails an upload.
+3. Images (`lib/images.ts`): sharp `rotate()` → ≤ 1600px webp q82 + ≤ 400px thumb q70. Never call
+   `.withMetadata()`: the stored file carries no EXIF/GPS; coordinates live only in the DB.
+4. Videos (`lib/video.ts`): `ffmpeg -map_metadata -1 -c:v h264_videotoolbox -b:v 4M
+   -vf "scale='min(1280,iw)':-2" -c:a aac -b:a 128k -movflags +faststart`, then a poster frame →
+   webp + thumb.
+5. Response: `imageUrl` (poster for video), `thumbUrl`, `videoUrl?`, `width`, `height`, `lat`, `lng`,
+   `takenAt`.
 
-Do not start a later phase until the earlier one runs end-to-end.
+Files live in `UPLOAD_DIR` (this repo's `./uploads`, gitignored — **irreplaceable, back it up
+separately**) under random UUID names. The DB stores route paths with the base path
+(`/adventure/api/media/<file>`), never disk paths or original filenames.
+`GET /api/media/[...path]` streams them with long-lived cache headers and **HTTP range support**
+(`206 Partial Content`), which video seeking and iOS playback need.
 
 ---
 
-## 9. Project structure
+## 9. Routes
+
+| Path | What |
+|---|---|
+| `/` | the shelf (v1: redirect to `/book/$DEFAULT_SLUG`) |
+| `/book/[slug]` | the world reader; `?p=<pageId>`, `?page=<order>` |
+| `/book/[slug]/edit` | the editor (redirects to unlock without a session) |
+| `/book/[slug]/unlock` | password card |
+| `/map` | every book's shown photos and videos that have coordinates; a pin opens `/book/<slug>?p=<pageId>` |
+| `/wishlist` | the shelf's wishlist (also wishes v1 filed under one of its books); read-only for visitors |
+| `/book/[slug]/map`, `/book/[slug]/wishlist` | redirect to `/map`, `/wishlist` (v1 pages under `?v=1`) |
+| `/dev/gallery` | every template × theme, for development; 404 in production |
+| `/api/session`, `/api/upload`, `/api/media/[...path]` | §7, §8 |
+
+Server Actions: `actions/v2/editor.ts` (slots, templates, themes, seeds, create / delete / restore /
+reorder stops, book settings) and `actions/v2/shelf.ts` (new book, delete empty book, wishlist).
+
+Map tiles (`lib/mapTiles.ts`): Stamen Watercolor via Stadia with `NEXT_PUBLIC_STADIA_API_KEY`
+(domain-restricted key; Stadia returns 401 from non-localhost hosts without one), otherwise plain OSM
+tiles. Keep the attribution visible — it is a licence requirement.
+
+---
+
+## 10. Feature flag, v1, rollback, deferred cleanup
+
+- `lib/v2/flag.ts`: v2 serves when `ADVENTURE_V2=1` (server env, read per request) or with `?v=2`;
+  `?v=1` forces the old app. `v2Suffix()` keeps `?v=2` on internal links only while it is a preview.
+- **The v1 app is still in the tree as the instant rollback**: `components/{reader,editor,map,
+  wishlist,ui}`, `actions/{book,pages,slots,wishlist}.ts`, `lib/{layouts,frames,tapes,themes,
+  types}.ts`, `app/book/[slug]/wishlist/edit`. Do not extend it. Removing it (and `framer-motion`,
+  `react-pageflip`) is a follow-up once the couple have confirmed v2.
+- **Rollback**: remove `ADVENTURE_V2` from `.env`, then `pm2 restart adventure-book --update-env`.
+  The database stays compatible both ways (v2 keeps `layout` in sync; v1 ignores the new columns).
+- **Deferred destructive cleanup — only with the user's explicit OK**: drop `Slot.rotation`,
+  `Slot.tapeStyle`, `Slot.aspect`, `Page.bgStyle`, `Book.editPasswordHash`, `WishlistItem.bookId`,
+  the `COVER`/`CLOSING` pages and enum values.
+
+---
+
+## 11. Development and tests
+
+- **Never develop or test against the live database or the live `uploads/`.** Work on a copy: database
+  `adventure_book_v2dev` (a `pg_dump` of the live one; the admin database is `template1` — there is no
+  `postgres` database), its own uploads copy, and `next dev -p 3012`. The redesign was built in the
+  worktree `../adventure-book-v2` (branch `v2`) set up exactly this way.
+- The copy's edit password is a test-only one (`dev-test-password`, set only on the copy;
+  `E2E_EDIT_PASSWORD` overrides it).
+- `npm test` — Vitest, `lib/**/*.test.ts`, pure logic (templates, world layout, dates, decorations,
+  bulk grouping, edits, visibility, backfill planners).
+- `npx playwright test` — needs the dev server on :3012; one worker, because the suites share the dev
+  database and edit it (each test puts back what it changes). `playwright.config.ts` refuses to run
+  against the live app. Specs: `gallery` (visual snapshots; dev server only), `reader`, `editor`
+  (including failed saves and undo), `parity`, `add-many`, `shelf`.
+- `npm run lint`, `npx tsc --noEmit` and `npm run build` must pass before merging.
+- **Real photos never go into the repo** (it has a GitHub remote): test images are generated with
+  sharp.
+- **Never run `npx prisma db seed` against real content** — it wipes the pages.
+- Backfill (idempotent; `--dry-run` prints the plan; refuses any database other than
+  `adventure_book_v2dev` without `--allow-prod`):
+  ```
+  npx tsx --env-file=.env scripts/v2/backfill.ts <media-dims|taken-at|templates|book-parts|shelf|all> [--dry-run] [--allow-prod]
+  ```
+
+---
+
+## 12. Conventions and guardrails
+
+- TypeScript strict, no `any`. Validate every Server Action and route input with zod.
+- Prisma client singleton in `lib/db.ts`.
+- `requireEditor` / `requireShelfEditor` before any side effect.
+- Captions, notes and wishes are plain text — rendered as text, never as HTML.
+- **UI**: prefer an icon over text (`components/v2/Icon.tsx`: 24px grid, 2px round strokes,
+  `currentColor`); text only for content or where an icon would be ambiguous. **No emoji in UI
+  chrome or system copy** (the couple's own captions may contain them). Every icon-only control has
+  `aria-label` and `title` (`IconButton` sets both). Visible focus states on every control.
+- **The editor preview must equal the reader**: change rendering in `components/world/` only, never
+  fork it for the editor; run the parity test.
+- Keep `Page.layout` in sync with `Page.template`, keep `Page.order` contiguous, migrations additive.
+- Respect `prefers-reduced-motion`; `alt` text everywhere.
+- Hand-written paths (fetch calls, media URLs) go through `withBase()` from `lib/basePath.ts`;
+  `next/link` and the router add the base path themselves.
+- Don't hardcode slugs or passwords; secrets stay out of the repo.
+
+---
+
+## 13. Environment variables
 
 ```
-app/
-  page.tsx                      // landing / redirect
-  book/[slug]/
-    page.tsx                    // reader
-    unlock/page.tsx             // password form
-    edit/page.tsx               // editor shell (guarded)
-  api/
-    session/route.ts            // POST/DELETE
-    upload/route.ts             // POST
-    media/[...path]/route.ts    // GET
-components/
-  reader/                       // Page renderers per layout, PolaroidFrame, PaperSpread, PageNav
-  editor/                       // PageList, LayoutPicker, SlotEditor, ImageUploader, MetaEditor
-  ui/                           // buttons, inputs, dialogs
-lib/
-  db.ts                         // Prisma client singleton
-  auth.ts                       // requireEditor, session sign/verify
-  layouts.ts                    // LAYOUTS (source of truth)
-  images.ts                     // sharp helpers
-  themes.ts                     // theme preset tokens
-actions/                        // server actions (page/slot/book mutations)
-prisma/
-  schema.prisma
-  seed.ts
-```
-
-Layout rendering: one small component per `Layout` value (e.g. `LayoutSingle`, `LayoutDuo`), selected by a `renderLayout(page)` switch. The **same** layout components render in both reader and editor preview — editor just overlays edit affordances. Keep a single rendering path so preview always matches reality.
-
----
-
-## 10. Conventions & guardrails
-
-- TypeScript strict; no `any`. Validate all Server Action / route inputs with **zod**.
-- Prisma client as a singleton in `lib/db.ts` (avoid dev hot-reload connection storms).
-- Every mutation and the upload route calls `requireEditor` **before** any side effect.
-- Sanitize/escape user text on render; captions and notes are plain text (no HTML injection). If you later allow light markdown, sanitize server-side.
-- Enforce upload size/type limits server-side, not just client-side.
-- Store media as route paths, never absolute disk paths. `UPLOAD_DIR` must be a persistent location, backed up separately from the repo.
-- Ordering: keep `Page.order` contiguous; `reorderPages` rewrites the full ordered list in one transaction.
-- Respect `prefers-reduced-motion`. Provide `alt` text everywhere.
-- Don't hardcode the slug/password — read from env / DB. Keep secrets out of the repo.
-- Commit per phase; keep migrations in version control.
-
----
-
-## 11. Environment variables
-
-```
-PORT=3002                  # app listens here (dev + prod)
-BASE_PATH=/adventure       # served under a subpath on the shared Funnel hostname
+PORT=3002                   # app port (dev server for the copy: 3012)
+BASE_PATH=/adventure        # served under a subpath on the shared Funnel hostname
+NEXT_PUBLIC_BASE_PATH=/adventure
 DATABASE_URL=postgresql://.../adventure_book
-SESSION_SECRET=            # jose HS256 signing secret (long random)
-UPLOAD_DIR=                # persistent path, e.g. /Users/<you>/adventure-book/uploads
-DEFAULT_SLUG=our-story     # v1 single-book redirect target
-SEED_EDIT_PASSWORD=        # plaintext used only by prisma/seed.ts to create the bcrypt hash
-NEXT_PUBLIC_STADIA_API_KEY= # optional; domain-restricted Stadia key for watercolor tiles on the public host
+SESSION_SECRET=             # jose HS256 secret (long random)
+UPLOAD_DIR=                 # persistent media folder: this repo's ./uploads (gitignored)
+DEFAULT_SLUG=our-story      # v1 landing redirect / fallback
+SEED_EDIT_PASSWORD=         # only for prisma/seed.ts on a fresh database
+NEXT_PUBLIC_STADIA_API_KEY= # optional, domain-restricted watercolor tiles
+ADVENTURE_V2=1              # serve v2 by default; unset = v1 (rollback)
 ```
 
 ---
 
-## 12. Deployment (Mac mini M4)
+## 14. Deployment (Mac mini M4)
 
-This app is **not** served at the domain root. The Mac mini runs several apps behind a single Tailscale Funnel hostname (`jafars-mac-mini.tail9e540f.ts.net`), differentiated by path. This one lives under **`/adventure`**.
+The app is served under **`/adventure`** on the shared Funnel hostname
+`jafars-mac-mini.tail9e540f.ts.net` (other apps live on the same host).
 
-- App runs on **port 3002** (set `PORT=3002`). In `package.json`, make the scripts explicit: `"dev": "next dev -p 3002"` and `"start": "next start -p 3002"`.
-- **Base path.** Set `basePath` in `next.config` so all routes and assets resolve under `/adventure`:
-  ```js
-  // next.config.js
-  const nextConfig = { basePath: process.env.BASE_PATH || "/adventure" };
-  ```
-  `next/link`, `next/image`, and the router handle `basePath` automatically. **Manual `fetch` calls do not** — any hand-written path (e.g. calling `/api/upload`, `/api/session`, or building an `imageUrl`) must be prefixed. Define one helper and use it everywhere:
-  ```ts
-  // lib/basePath.ts
-  export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "/adventure";
-  export const withBase = (p: string) => `${BASE_PATH}${p}`;
-  ```
-  Store media as `withBase("/api/media/<cuid>.webp")` so paths stay correct under the subpath.
-- **Cookie scope (important).** Because every app on the Mac mini shares the same hostname, cookies leak across apps unless scoped. Set the `ab_session` cookie with **`Path=/adventure`** so it isn't sent to (or clobbered by) Signum or any other app on the same host. Use a book-specific cookie name too (`ab_session`, not `session`).
-- PostgreSQL via Homebrew; run `prisma migrate deploy` on release.
-- `next build` then run under **PM2**: `PORT=3002 pm2 start npm --name adventure-book -- start`, then `pm2 save`.
-- Confirm nothing else already occupies 3002 — `lsof -i :3002` should be empty before first start.
-- **Exposed via a shared Caddy gateway, not a direct Funnel path mount.** `tailscale funnel --set-path` strips the prefix before proxying, which breaks any app expecting basePath intact — so instead, Funnel forwards *everything* on `:443` to a local Caddy instance on `:8080`, and Caddy does the per-app path routing with the request URI untouched:
-  ```bash
-  tailscale funnel --bg 8080          # once, covers every app on the host
-  tailscale funnel status             # verify: / proxy http://127.0.0.1:8080
-  ```
-  Caddy config lives outside this repo at `~/Koding/_gateway/Caddyfile` (shared across apps on the Mac mini):
-  ```caddyfile
-  @adventure path /adventure /adventure/*
-  handle @adventure {
-      reverse_proxy 127.0.0.1:3002
-  }
-  ```
-  Adding a new app on this host: give it a port, set its `basePath` to match, add one matcher+handle pair here, `caddy reload`. Don't add another direct `tailscale funnel --set-path` mount — it'll fight the gateway for the same paths.
-  Public URL: `https://jafars-mac-mini.tail9e540f.ts.net/adventure`. Funnel always serves HTTPS, so keep the session cookie `Secure`.
-  **Boot persistence:** Caddy runs as a PM2 app named `gateway` (not a separate service), so it, `adventure-book`, and `signum-web` all restart together via `pm2 resurrect`. That's triggered at boot by a **LaunchDaemon** (`/Library/LaunchDaemons/com.PM2.daemon.plist`, `UserName jafarfadli`, `RunAtLoad` + `LaunchOnlyOnce`), which runs system-wide before login — no auto-login needed. After changing which apps PM2 manages, run `pm2 save` so the next resurrect picks it up.
-- `UPLOAD_DIR` lives on local disk outside the build dir; include it in your backup routine (photos are irreplaceable).
-- Set `NODE_ENV=production`; confirm `next.config` allows serving images through the media route (they're not in `/public`).
+- Runs on **port 3002** (`next dev -p 3002` / `next start -p 3002` in `package.json`); `basePath` comes
+  from `BASE_PATH` in `next.config.ts`. Check `lsof -i :3002` before a first start.
+- **Cookie scope**: `ab_session` with `Path=/adventure`, so other apps on the hostname never see or
+  clobber it. Funnel is always HTTPS, so the cookie stays `Secure`.
+- **PM2**: `PORT=3002 pm2 start npm --name adventure-book -- start`, then `pm2 save`.
+- **Gateway**: Funnel forwards everything on :443 to a shared Caddy on :8080
+  (`tailscale funnel --bg 8080`), which routes by path with the URI untouched
+  (`~/Koding/_gateway/Caddyfile`: `@adventure path /adventure /adventure/*` →
+  `reverse_proxy 127.0.0.1:3002`). Never add a `tailscale funnel --set-path` mount — it strips the
+  prefix and fights the gateway. A new app on the host = a port, a matching basePath, one
+  matcher+handle pair, `caddy reload`.
+- **Boot persistence**: Caddy runs as the PM2 app `gateway`; `gateway`, `adventure-book` and
+  `signum-web` come back via `pm2 resurrect`, started at boot by the LaunchDaemon
+  `/Library/LaunchDaemons/com.PM2.daemon.plist` (user `jafarfadli`, `RunAtLoad` + `LaunchOnlyOnce`).
+  After changing which apps PM2 manages, run `pm2 save`.
+- **Redeploy** (code only): `npm run build && pm2 restart adventure-book` (add `--update-env` after
+  editing `.env`).
+- **Release with database changes**:
+  1. Back up first: `pg_dump` to a dated file outside the repo, and copy `uploads/`.
+  2. `npm install`, then `npx prisma migrate deploy`.
+  3. Run any needed backfill with `--allow-prod` (dry-run first).
+  4. `npm run build && pm2 restart adventure-book`, then check the public URL.
+- `UPLOAD_DIR` and the database dumps belong in the backup routine — the photos are irreplaceable.
+
+Public URL: `https://jafars-mac-mini.tail9e540f.ts.net/adventure`.
