@@ -7,18 +7,43 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// v2: the couple's library. Holds the shared edit password and the wishlist;
+// books hang off it. (Book.editPasswordHash and WishlistItem.bookId stay until
+// the v1 cleanup is approved.)
+model Shelf {
+  id               String         @id @default(cuid())
+  title            String
+  editPasswordHash String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  books            Book[]
+  wishlist         WishlistItem[]
+}
+
 model Book {
-  id               String   @id @default(cuid())
-  slug             String   @unique            // public URL segment, e.g. "our-story"
+  id               String         @id @default(cuid())
+  slug             String         @unique // public URL segment, e.g. "our-story"
   title            String
   subtitle         String?
-  theme            String   @default("cream")  // theme preset key
+  theme            String         @default("cream") // theme preset key
   coverImageUrl    String?
-  editPasswordHash String                      // bcrypt hash; plaintext known only to editors
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  editPasswordHash String // bcrypt hash; plaintext known only to editors
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
   pages            Page[]
   wishlist         WishlistItem[]
+
+  // v2
+  shelfId     String?
+  shelf       Shelf?  @relation(fields: [shelfId], references: [id], onDelete: SetNull)
+  shelfOrder  Int     @default(0) // position on the shelf
+  volume      Int? // "vol. N" on the cover
+  coverText   String? // handwritten note on the cover
+  coverFocusX Float   @default(0.5) // focal point of the cover photo (0..1)
+  coverFocusY Float   @default(0.5)
+  closingText String? // closing words on the "bersambung" sign
+
+  @@index([shelfId])
 }
 
 model WishlistItem {
@@ -32,17 +57,27 @@ model WishlistItem {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  // v2: wishlists belong to the shelf (bookId kept for the v1 app)
+  shelfId String?
+  shelf   Shelf?  @relation(fields: [shelfId], references: [id], onDelete: Cascade)
+
   @@index([bookId])
+  @@index([shelfId])
 }
 
 model Page {
-  id        String   @id @default(cuid())
-  bookId    String
-  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  order     Int // 0-based position within the book
-  layout    Layout   @default(SINGLE)
-  bgStyle   String? // optional per-page paper override
-  slots     Slot[]
+  id      String  @id @default(cuid())
+  bookId  String
+  book    Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  order   Int // 0-based position within the book
+  layout  Layout  @default(SINGLE)
+  bgStyle String? // optional per-page paper override
+  slots   Slot[]
+
+  // v2
+  template  String? // v2 template key; null = derived from layout + photo shapes
+  theme     String? // v2 theme key; null = the book's theme
+  decorSeed Int      @default(0) // bumped by "shuffle decorations"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -51,26 +86,34 @@ model Page {
 }
 
 model Slot {
-  id        String   @id @default(cuid())
-  pageId    String
-  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  key       String // slot id within the layout, e.g. "photo1", "text1"
-  type      SlotType
-  imageUrl  String? // PHOTO: processed image path · VIDEO: poster frame path
-  thumbUrl  String? // PHOTO/VIDEO: small thumbnail / poster thumb
-  videoUrl  String? // VIDEO: transcoded web-safe MP4 (H.264/AAC) path
-  aspect    String? // PHOTO/VIDEO frame format: "portrait" | "square" | "landscape" (null = square)
-  caption   String? // PHOTO: hand-written caption under the photo
-  text      String? // TEXT: the note/letter/quote body
-  rotation  Float    @default(0) // decorative tilt in degrees (approx -6..6)
-  tapeStyle String? // decorative tape/sticker preset key, nullable
-  dateLabel String? // optional hand-written date stamp
+  id             String   @id @default(cuid())
+  pageId         String
+  page           Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  key            String // slot id within the layout, e.g. "photo1", "text1"
+  type           SlotType
+  imageUrl       String? // PHOTO: processed image path · VIDEO: poster frame path
+  thumbUrl       String? // PHOTO/VIDEO: small thumbnail / poster thumb
+  videoUrl       String? // VIDEO: transcoded web-safe MP4 (H.264/AAC) path
+  aspect         String? // PHOTO/VIDEO frame format: "portrait" | "square" | "landscape" (null = square)
+  caption        String? // PHOTO: hand-written caption under the photo
+  text           String? // TEXT: the note/letter/quote body
+  rotation       Float    @default(0) // decorative tilt in degrees (approx -6..6)
+  tapeStyle      String? // decorative tape/sticker preset key, nullable
+  dateLabel      String? // optional hand-written date stamp
   lat            Float? // PHOTO: decimal latitude (from EXIF GPS or set manually)
   lng            Float? // PHOTO: decimal longitude
   locationLabel  String? // optional human label, e.g. "Bandung"
   locationSource String? // "exif" | "manual" — how lat/lng was set (null if unset)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  // v2
+  focusX    Float     @default(0.5) // crop focal point inside the template frame (0..1)
+  focusY    Float     @default(0.5)
+  width     Int? // pixel size of the stored media (poster for video)
+  height    Int?
+  takenAt   DateTime? // capture time from EXIF / QuickTime, or parsed from dateLabel
+  showDate  Boolean   @default(true) // false hides the date stamp
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@unique([pageId, key])
   @@index([pageId])
