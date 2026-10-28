@@ -60,10 +60,17 @@ export async function getEditorBookId(): Promise<string | null> {
   return (await readSession())?.bookId ?? null;
 }
 
-/** The shelf the current session may edit (v2 sessions only), or null. */
+/**
+ * The shelf the current session may edit, or null. A v1 token (book only,
+ * from before shelves existed) counts for the shelf its book sits on, so
+ * nobody has to unlock again after the switch.
+ */
 export async function getEditorShelfId(): Promise<string | null> {
   const s = await readSession();
-  return typeof s?.shelfId === "string" ? s.shelfId : null;
+  if (!s) return null;
+  if (typeof s.shelfId === "string") return s.shelfId;
+  const book = await prisma.book.findUnique({ where: { id: s.bookId }, select: { shelfId: true } });
+  return book?.shelfId ?? null;
 }
 
 /** Whether the session may edit this book: unlocked from it, or from its shelf. */
