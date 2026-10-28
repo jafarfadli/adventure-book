@@ -21,7 +21,7 @@ export type SlotV2 = {
   lng: number | null;
   locationLabel: string | null;
   /** "exif" | "manual" — a manual pin is never replaced by a re-upload's EXIF */
-  locationSource: string | null;
+  locationSource: "exif" | "manual" | null;
   width: number | null;
   height: number | null;
 };

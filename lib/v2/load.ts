@@ -56,7 +56,7 @@ export function toSlotV2(s: SlotRow): SlotV2 {
     lat: s.lat,
     lng: s.lng,
     locationLabel: s.locationLabel,
-    locationSource: s.locationSource,
+    locationSource: s.locationSource === "exif" || s.locationSource === "manual" ? s.locationSource : null,
     width: s.width,
     height: s.height,
   };

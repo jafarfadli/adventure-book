@@ -174,7 +174,8 @@ export function Station({
           ),
         )}
 
-      {t.captionLabel && (page.slots.video1?.caption || edit) && (
+      {/* identical to the reader: an empty label appears only while typing it */}
+      {t.captionLabel && (page.slots.video1?.caption || typingOn("video1", "caption")) && (
         <CaptionLabel box={t.captionLabel} text={page.slots.video1?.caption ?? ""} edit={textEdit("video1", "caption")} />
       )}
 
