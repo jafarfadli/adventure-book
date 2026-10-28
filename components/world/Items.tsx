@@ -7,6 +7,7 @@ import { longDate, stampParts } from "@/lib/v2/dates";
 import { THEMES, themeCssVars, type ThemeKey } from "@/lib/v2/themes";
 import type { BookV2, PageV2 } from "@/lib/v2/types";
 import type { Segment, WorldLayout } from "@/lib/v2/world";
+import { FitLine } from "./items/FitLine";
 import { CARD_SHADOW, u } from "./items/units";
 import { Station, type StationEdit } from "./Station";
 
@@ -47,16 +48,12 @@ function StartSign({ seg, book }: { seg: Segment; book: BookV2 }) {
       <Post left="22%" top={120} height={310} />
       <Post left="78%" top={120} height={310} />
       <Board style={{ transform: "rotate(-1.5deg)" }}>
-        <span className="block font-hand-alt" style={{ fontSize: u(17), color: "var(--c3)" }}>
-          Buku ini milik
-        </span>
-        <span className="block font-hand font-bold" style={{ fontSize: u(50), lineHeight: 1.05, color: "var(--c4)" }}>
-          {book.title}
-        </span>
-        <span className="mt-[0.4em] block font-hand-alt" style={{ fontSize: u(15), color: "var(--c3)" }}>
-          vol. {book.volume}
-          {first ? ` · dimulai ${longDate(first)}` : ""}
-        </span>
+        <FitLine text={book.title} size={u(50)} className="font-hand font-bold" style={{ lineHeight: 1.05, color: "var(--c4)" }} />
+        {first && (
+          <span className="mt-[0.4em] block font-hand-alt" style={{ fontSize: u(15), color: "var(--c3)" }}>
+            dimulai {longDate(first)}
+          </span>
+        )}
         <span className="mt-[0.5em] inline-block animate-[ab-nudge_1.6s_ease-in-out_infinite] motion-reduce:animate-none" style={{ color: "var(--c3)" }}>
           <Icon name="arrow-right" className="h-[1.6em] w-[1.6em]" />
         </span>

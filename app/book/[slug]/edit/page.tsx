@@ -20,7 +20,7 @@ export default async function EditPage({ params, searchParams }: Props) {
     if (!book) notFound();
     const suffix = v2Suffix(sp.v);
     if (!(await canEditBook(book.id))) redirect(`/book/${slug}/unlock${suffix}`);
-    return <EditorWorld initial={book} readerHref={`/book/${slug}${suffix}`} />;
+    return <EditorWorld initial={book} readerHref={`/book/${slug}${suffix}`} shelfHref={`/${suffix}`} />;
   }
 
   const book = await prisma.book.findUnique({

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { deleteEmptyBookV2 } from "@/actions/v2/shelf";
 import { Icon, IconButton } from "@/components/v2/Icon";
@@ -9,17 +8,22 @@ import type { BookV2 } from "@/lib/v2/types";
 import { uploadMedia } from "../upload";
 import { ThemeRow } from "./Pickers";
 
-// The book's own parts: title and volume, the cover photo (and which part of
-// it shows in the arch window), the note on the cover, the closing words and
-// the book's theme. Text saves when the field is left.
+// The book's own parts: the title, the cover photo (and which part of it
+// shows in the arch window), the note on the cover, the closing words and the
+// book's theme. Text saves when the field is left. Opened from the editor's
+// top bar and from a book on the shelf.
+
+/** What the panel needs: the editor passes its book, the shelf one of its books. */
+export type PanelBook = Pick<
+  BookV2,
+  "id" | "title" | "theme" | "coverImageUrl" | "coverFocusX" | "coverFocusY" | "coverText" | "closingText"
+> & { stops: number };
 
 const field =
   "h-12 w-full rounded-xl border border-[#e7dfe2] bg-white px-3 font-hand text-2xl font-bold text-[#2b2326] focus-visible:outline-2 focus-visible:outline-[#2b2326]";
 
-export function BookPanel({ book, onPatch, shelfHref = "/" }: { book: BookV2; onPatch: (p: BookPatch) => void; shelfHref?: string }) {
-  const router = useRouter();
+export function BookPanel({ book, onPatch, onDeleted }: { book: PanelBook; onPatch: (p: BookPatch) => void; onDeleted: () => void }) {
   const [title, setTitle] = useState(book.title);
-  const [volume, setVolume] = useState(String(book.volume));
   const [coverText, setCoverText] = useState(book.coverText ?? "");
   const [closing, setClosing] = useState(book.closingText ?? "");
   const [uploading, setUploading] = useState(false);
@@ -82,20 +86,6 @@ export function BookPanel({ book, onPatch, shelfHref = "/" }: { book: BookV2; on
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <input aria-label="Judul buku" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} onBlur={() => title.trim() && title !== book.title && onPatch({ title: title.trim() })} className={field} />
-          <label className="flex items-center gap-2 font-hand-alt text-[#665b60]">
-            <span>vol.</span>
-            <input
-              aria-label="Volume"
-              inputMode="numeric"
-              value={volume}
-              onChange={(e) => setVolume(e.target.value.replace(/\D/g, "").slice(0, 3))}
-              onBlur={() => {
-                const v = Number(volume);
-                if (v >= 1 && v !== book.volume) onPatch({ volume: v });
-              }}
-              className="h-10 w-16 rounded-lg border border-[#e7dfe2] bg-white px-2 text-center text-lg"
-            />
-          </label>
           <input
             aria-label="Catatan di sampul"
             placeholder="…"
@@ -125,7 +115,7 @@ export function BookPanel({ book, onPatch, shelfHref = "/" }: { book: BookV2; on
           <ThemeRow current={book.theme} bookTheme={book.theme} allowFollow={false} onPick={(t) => t && onPatch({ theme: t })} />
         </div>
       </div>
-      {book.pages.length === 0 && (
+      {book.stops === 0 && (
         <div className="flex justify-end">
           <IconButton
             icon="trash"
@@ -134,7 +124,7 @@ export function BookPanel({ book, onPatch, shelfHref = "/" }: { book: BookV2; on
             className="text-[#a3324f]"
             onClick={async () => {
               await deleteEmptyBookV2(book.id);
-              router.push(shelfHref);
+              onDeleted();
             }}
           />
         </div>

@@ -14,12 +14,15 @@ editable only by the couple, with one shared password, directly inside the book.
 
 ## 1. Product
 
-- **Shelf** (`/`): the couple's books stand face-out on a paper shelf. Editors get a ghost book with ＋
-  to start the next volume (title + theme). A book with no stops can be deleted from its settings.
+- **Shelf** (`/`): the couple's books stand face-out on a paper shelf under the shelf's name (also
+  the tab title). Editors rename the shelf by tapping its name, open a book's settings from the
+  pencil on it, and start a new book with the ghost book's ＋ (title + theme). A book with no stops
+  can be deleted from its settings.
 - **Book = one world** (`/book/[slug]`):
   - **Cover overlay**: felt board, stitched spine, die-cut window showing the cover photo. Shown once
     per session per book (`sessionStorage ab-opened:<slug>`), skipped for deep links.
-  - **Start sign**: title, `vol. N`, the date it began.
+  - **Start sign**: the title and the date it began. (Volumes are stored but never shown; the
+    couple asked for no "vol." and no "Buku ini milik".)
   - **Stops**: one per `Page`, in `Page.order`. Each stop has a template (fixed frames) and a theme
     (palette + asset kit). Decorations are placed automatically; the dice reshuffles them.
   - **Month signposts**: inserted automatically wherever the month changes between dated stops.
@@ -127,6 +130,8 @@ keeps the preview identical to the reader; `e2e/parity.spec.ts` compares the pix
 
 - **Scale**: `s = min(viewportHeight / 720, viewportWidth / 460)` px per u (`lib/v2/scale.ts`),
   exposed as `--u`.
+- **Titles** the couple typed (cover label, start sign) render through `items/FitLine.tsx`: one
+  line that shrinks to fit (down to 60%) before it ellipsizes.
 - **Layout** (`lib/v2/world.ts`, pure and unit-tested): start (420u) · stops · month signs (180u) ·
   end (880u), with 90u gaps. Every segment owns one scenery slice; slices tile the world exactly, and a
   theme change always falls in a gap. The sky colour crossfades over ±260u.
@@ -154,8 +159,9 @@ keeps the preview identical to the reader; `e2e/parity.spec.ts` compares the pix
 - **Select by tapping**: a stop's empty space selects the stop; a photo selects its slot; a caption or
   note opens an inline editor exactly over the text (same font, size and width). Esc deselects.
 - **Top bar**: done, undo, save status (saved / saving / warning — tap the warning to retry), all
-  pages (real-render tiles; drag to reorder, tap to jump), book settings (title, vol., cover photo and
-  its focus, cover note, closing text, book theme, delete an empty book).
+  pages (real-render tiles; drag to reorder, tap to jump), book settings (`BookPanel`: title, cover
+  photo and its focus, cover note, closing text, book theme, delete an empty book — the same panel
+  the shelf opens).
 - **Dock** (one bar, changes with the selection):
   - stop: template · page theme ("ikut buku" or one of five) · shuffle decorations · delete
   - photo / video: replace · focus (drag the photo inside its frame) · caption · date · location · clear
@@ -234,7 +240,8 @@ separately**) under random UUID names. The DB stores route paths with the base p
 | `/api/session`, `/api/upload`, `/api/media/[...path]` | §7, §8 |
 
 Server Actions: `actions/v2/editor.ts` (slots, templates, themes, seeds, create / delete / restore /
-reorder stops, book settings) and `actions/v2/shelf.ts` (new book, delete empty book, wishlist).
+reorder stops, book settings) and `actions/v2/shelf.ts` (shelf name, new book, delete empty book,
+wishlist).
 
 Map tiles (`lib/mapTiles.ts`): Stamen Watercolor via Stadia with `NEXT_PUBLIC_STADIA_API_KEY`
 (domain-restricted key; Stadia returns 401 from non-localhost hosts without one), otherwise plain OSM

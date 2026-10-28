@@ -8,7 +8,7 @@ import { shelfWishes } from "@/lib/v2/shelf";
 import { slugify, uniqueSlug } from "@/lib/v2/slug";
 import { THEME_KEYS } from "@/lib/v2/themes";
 
-// Shelf-level mutations: a new book (next volume), and the shared wishlist.
+// Shelf-level mutations: the shelf's title, a new book, and the shared wishlist.
 // The shelf comes from the session itself; requireShelfEditor runs before
 // anything is written.
 
@@ -17,6 +17,13 @@ async function sessionShelf(): Promise<string> {
   if (!shelfId) throw new Error("Unauthorized: shelf editor session required");
   await requireShelfEditor(shelfId);
   return shelfId;
+}
+
+export async function renameShelfV2(titleRaw: string): Promise<void> {
+  const title = z.string().trim().min(1).max(120).parse(titleRaw);
+  const shelfId = await sessionShelf();
+  await prisma.shelf.update({ where: { id: shelfId }, data: { title } });
+  revalidatePath("/");
 }
 
 export async function createBookV2(titleRaw: string, themeRaw: string): Promise<{ slug: string }> {

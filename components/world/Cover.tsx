@@ -5,6 +5,7 @@ import { globalScallopPath, globalWavePath } from "@/lib/v2/shapes";
 import { THEMES, themeCssVars, type ThemeKey } from "@/lib/v2/themes";
 import type { BookV2 } from "@/lib/v2/types";
 import { EDGE, FELT_URL, GRAIN_URL, LIFT } from "./art/defs";
+import { FitLine } from "./items/FitLine";
 import { KITS } from "./themes";
 
 // The closed book: a felt board in the book's theme with a stitched spine,
@@ -13,7 +14,7 @@ import { KITS } from "./themes";
 
 const cu = (n: number) => `calc(var(--cu) * ${n})`;
 
-type CoverBook = Pick<BookV2, "title" | "volume" | "theme" | "coverImageUrl" | "coverFocusX" | "coverFocusY" | "coverText">;
+type CoverBook = Pick<BookV2, "title" | "theme" | "coverImageUrl" | "coverFocusX" | "coverFocusY" | "coverText">;
 
 export function Cover({ book, back = false, className = "" }: { book: CoverBook; back?: boolean; className?: string }) {
   const theme: ThemeKey = book.theme;
@@ -114,11 +115,9 @@ export function Cover({ book, back = false, className = "" }: { book: CoverBook;
                 boxShadow: `inset 0 0 0 ${cu(8)} var(--paper), inset 0 0 0 ${cu(10)} var(--c2), ${cu(2)} ${cu(4)} ${cu(6)} rgba(30,16,20,0.3)`,
               }}
             >
-              <div className="truncate font-hand font-bold" style={{ fontSize: cu(50), lineHeight: 1.1, color: "var(--c4)" }}>
-                {book.title}
-              </div>
+              <FitLine text={book.title} size={cu(50)} className="font-hand font-bold" style={{ lineHeight: 1.1, color: "var(--c4)" }} />
               <div className="font-hand-alt" style={{ fontSize: cu(17), color: "var(--c3)" }}>
-                Adventure Book · vol. {book.volume}
+                Adventure Book
               </div>
             </div>
 
@@ -163,9 +162,6 @@ export function Cover({ book, back = false, className = "" }: { book: CoverBook;
           >
             <span className="font-hand font-bold" style={{ fontSize: cu(30), color: "var(--c4)", lineHeight: 1 }}>
               bersambung
-            </span>
-            <span className="font-hand-alt" style={{ fontSize: cu(15), color: "var(--c3)" }}>
-              vol. {book.volume}
             </span>
           </div>
         )}

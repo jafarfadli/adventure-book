@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Shelf } from "@/components/shelf/Shelf";
 import { getEditorShelfId } from "@/lib/auth";
@@ -5,6 +6,12 @@ import { isV2, v2Suffix } from "@/lib/v2/flag";
 import { loadShelf } from "@/lib/v2/shelf";
 
 type Props = { searchParams: Promise<{ v?: string }> };
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  if (!isV2((await searchParams).v)) return {};
+  const shelf = await loadShelf();
+  return shelf ? { title: shelf.title } : {};
+}
 
 // v2: the shelf of books. v1 hosts a single book: the landing page just
 // forwards to it.

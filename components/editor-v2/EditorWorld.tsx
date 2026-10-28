@@ -30,7 +30,7 @@ type SheetKind = "template" | "theme" | "date" | "location" | "add" | "book" | "
  * a caption or note to type in place. One dock of icons acts on the
  * selection; ＋ on the path adds stops right there. Everything saves itself.
  */
-export function EditorWorld({ initial, readerHref }: { initial: BookV2; readerHref: string }) {
+export function EditorWorld({ initial, readerHref, shelfHref }: { initial: BookV2; readerHref: string; shelfHref: string }) {
   const router = useRouter();
   const ed = useEditorBook(initial);
   const { book } = ed;
@@ -326,7 +326,7 @@ export function EditorWorld({ initial, readerHref }: { initial: BookV2; readerHr
       )}
       {sheet === "book" && (
         <Sheet label="Pengaturan buku" onClose={() => setSheet(null)}>
-          <BookPanel book={book} onPatch={(p) => ed.editBook(p)} />
+          <BookPanel book={{ ...book, stops: book.pages.length }} onPatch={(p) => ed.editBook(p)} onDeleted={() => router.push(shelfHref)} />
         </Sheet>
       )}
       {sheet === "pages" && (

@@ -20,6 +20,9 @@ test("the shut cover opens into the world, once per session", async ({ page }) =
   await cover.click();
   await expect(cover).toBeHidden({ timeout: 3000 });
   await region(page);
+  // the start sign is just the title and when it began
+  await expect(page.getByText("dimulai", { exact: false }).first()).toBeVisible();
+  await expect(page.getByText(/Buku ini milik|vol\. \d/)).toHaveCount(0);
   await page.reload();
   await region(page);
   await expect(page.getByRole("button", { name: "Buka buku" })).toHaveCount(0);
