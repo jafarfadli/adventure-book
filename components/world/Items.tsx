@@ -8,7 +8,10 @@ import { THEMES, themeCssVars, type ThemeKey } from "@/lib/v2/themes";
 import type { BookV2, PageV2 } from "@/lib/v2/types";
 import type { Segment, WorldLayout } from "@/lib/v2/world";
 import { CARD_SHADOW, u } from "./items/units";
-import { Station } from "./Station";
+import { Station, type StationEdit } from "./Station";
+
+/** Per-stop editor props (undefined in the reader). */
+export type StationHooks = StationEdit;
 
 // Everything that sits on the path at scroll speed: the stops themselves and
 // the book's own signs — the start board (bookplate), month signposts and the
@@ -154,12 +157,14 @@ export const Items = memo(function Items({
   pagesById,
   wishlistHref,
   onCloseBook,
+  station,
 }: {
   layout: WorldLayout;
   book: BookV2;
   pagesById: Map<string, PageV2>;
   wishlistHref: string;
   onCloseBook?: () => void;
+  station?: (page: PageV2) => StationHooks | undefined;
 }) {
   return (
     <>
@@ -182,7 +187,7 @@ export const Items = memo(function Items({
               contentVisibility: "auto",
             }}
           >
-            <Station page={page} x={60} label={`Halaman ${seg.index + 1}`} />
+            <Station page={page} x={60} label={`Halaman ${seg.index + 1}`} edit={station?.(page)} />
           </div>
         ) : null;
       })}

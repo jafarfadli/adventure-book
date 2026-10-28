@@ -1,5 +1,7 @@
 import { LETTER_POCKET, type TextSpec } from "@/lib/v2/templates";
 import type { Mount as MountKind } from "../themes";
+import type { TextEdit } from "./edit-types";
+import { InlineArea } from "./EditText";
 import { Mount } from "./Mount";
 import { CARD_SHADOW, PAPER, u } from "./units";
 
@@ -13,8 +15,9 @@ const clamp = (lines: number): React.CSSProperties => ({
   overflow: "hidden",
 });
 
-export function Note({ spec, text, mount }: { spec: TextSpec; text: string | null; mount: MountKind }) {
+export function Note({ spec, text, mount, edit }: { spec: TextSpec; text: string | null; mount: MountKind; edit?: TextEdit }) {
   const line = 30;
+  const font = { fontSize: u(18), lineHeight: u(line), color: "var(--ink)" };
   return (
     <div
       className="absolute"
@@ -31,20 +34,21 @@ export function Note({ spec, text, mount }: { spec: TextSpec; text: string | nul
         padding: `${u(18)} ${u(18)} ${u(12)}`,
       }}
     >
-      <p
-        data-text="text1"
-        className="m-0 whitespace-pre-wrap font-hand-alt"
-        style={{ fontSize: u(18), lineHeight: u(line), color: "var(--ink)", ...clamp(spec.maxLines) }}
-      >
-        {text ?? ""}
-      </p>
+      {edit?.typing ? (
+        <InlineArea label="Cerita" value={text ?? ""} onChange={edit.onType} onDone={edit.onDone} className="font-hand-alt" style={font} />
+      ) : (
+        <p data-text="text1" className="m-0 h-full whitespace-pre-wrap font-hand-alt" style={{ ...font, ...clamp(spec.maxLines) }}>
+          {text ?? ""}
+        </p>
+      )}
       <Mount kind={mount === "bow" ? "dots" : mount} cardW={spec.w} />
     </div>
   );
 }
 
-export function Letter({ spec, text }: { spec: TextSpec; text: string | null }) {
+export function Letter({ spec, text, edit }: { spec: TextSpec; text: string | null; edit?: TextEdit }) {
   const line = 34;
+  const font = { fontSize: u(19), lineHeight: u(line), color: "var(--ink)" };
   return (
     <>
       <div
@@ -62,13 +66,13 @@ export function Letter({ spec, text }: { spec: TextSpec; text: string | null }) 
           padding: `${u(42)} ${u(22)} ${u(16)} ${u(60)}`,
         }}
       >
-        <p
-          data-text="text1"
-          className="m-0 whitespace-pre-wrap font-hand-alt"
-          style={{ fontSize: u(19), lineHeight: u(line), color: "var(--ink)", ...clamp(spec.maxLines) }}
-        >
-          {text ?? ""}
-        </p>
+        {edit?.typing ? (
+          <InlineArea label="Isi surat" value={text ?? ""} onChange={edit.onType} onDone={edit.onDone} className="font-hand-alt" style={font} />
+        ) : (
+          <p data-text="text1" className="m-0 h-full whitespace-pre-wrap font-hand-alt" style={{ ...font, ...clamp(spec.maxLines) }}>
+            {text ?? ""}
+          </p>
+        )}
       </div>
       <svg
         aria-hidden
@@ -93,7 +97,8 @@ export function Letter({ spec, text }: { spec: TextSpec; text: string | null }) 
   );
 }
 
-export function Quote({ spec, text }: { spec: TextSpec; text: string | null }) {
+export function Quote({ spec, text, edit }: { spec: TextSpec; text: string | null; edit?: TextEdit }) {
+  const font = { fontSize: u(46), lineHeight: 1.08, color: "var(--c4)" };
   return (
     <div className="absolute" style={{ left: u(spec.x), top: u(spec.y), width: u(spec.w), height: u(spec.h) }}>
       <svg aria-hidden className="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 400 260">
@@ -109,13 +114,19 @@ export function Quote({ spec, text }: { spec: TextSpec; text: string | null }) {
           &ldquo;
         </text>
       </svg>
-      <p
-        data-text="text1"
-        className="absolute m-0 grid place-items-center text-center font-hand font-bold whitespace-pre-wrap"
-        style={{ inset: `${u(50)} ${u(56)} ${u(30)}`, fontSize: u(46), lineHeight: 1.08, color: "var(--c4)", ...clamp(spec.maxLines) }}
-      >
-        {text ?? ""}
-      </p>
+      {edit?.typing ? (
+        <div className="absolute" style={{ inset: `${u(60)} ${u(56)} ${u(30)}` }}>
+          <InlineArea label="Kutipan" value={text ?? ""} onChange={edit.onType} onDone={edit.onDone} className="text-center font-hand font-bold" style={font} />
+        </div>
+      ) : (
+        <p
+          data-text="text1"
+          className="absolute m-0 grid place-items-center text-center font-hand font-bold whitespace-pre-wrap"
+          style={{ inset: `${u(50)} ${u(56)} ${u(30)}`, ...font, ...clamp(spec.maxLines) }}
+        >
+          {text ?? ""}
+        </p>
+      )}
     </div>
   );
 }

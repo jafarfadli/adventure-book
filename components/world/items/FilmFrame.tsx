@@ -5,8 +5,10 @@ import { Icon } from "@/components/v2/Icon";
 import { cardBox, ratioValue, windowOffset, windowSize, type FrameSpec } from "@/lib/v2/templates";
 import type { SlotV2 } from "@/lib/v2/types";
 import type { Mount as MountKind } from "../themes";
+import type { TextEdit } from "./edit-types";
+import { InlineInput } from "./EditText";
 import { Mount } from "./Mount";
-import { PhotoWindow } from "./PhotoWindow";
+import { PhotoWindow, type FocusDrag } from "./PhotoWindow";
 import { CARD_SHADOW, u } from "./units";
 
 const FILM = "#2d2622";
@@ -30,12 +32,14 @@ export function FilmFrame({
   mount,
   lowRes,
   interactive = true,
+  focus,
 }: {
   frame: FrameSpec;
   slot: SlotV2 | undefined;
   mount: MountKind;
   lowRes?: boolean;
   interactive?: boolean;
+  focus?: FocusDrag;
 }) {
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -95,8 +99,8 @@ export function FilmFrame({
           />
         ) : (
           <>
-            <PhotoWindow slot={slot} w={win.w} h={win.h} lowRes={lowRes} />
-            {slot?.videoUrl && (
+            <PhotoWindow slot={slot} w={win.w} h={win.h} lowRes={lowRes} focus={focus} />
+            {slot?.videoUrl && !focus?.active && (
               <button
                 type="button"
                 aria-label="Putar video"
@@ -121,25 +125,36 @@ export function FilmFrame({
 }
 
 /** Paper label under the film carrying the video's caption. */
-export function CaptionLabel({ box, text }: { box: { x: number; y: number; w: number; h: number; rot: number }; text: string }) {
+export function CaptionLabel({
+  box,
+  text,
+  edit,
+}: {
+  box: { x: number; y: number; w: number; h: number; rot: number };
+  text: string;
+  edit?: TextEdit;
+}) {
+  const style = { lineHeight: u(box.h), fontSize: u(24), color: "var(--ink)" };
   return (
     <div
       data-caption="video1"
-      className="absolute truncate px-2 text-center font-hand font-bold"
+      className="absolute px-2 text-center font-hand font-bold"
       style={{
         left: u(box.x),
         top: u(box.y),
         width: u(box.w),
         height: u(box.h),
-        lineHeight: u(box.h),
-        fontSize: u(24),
-        color: "var(--ink)",
         background: "#fffdf8",
         boxShadow: CARD_SHADOW,
         transform: `rotate(${box.rot}deg)`,
+        ...style,
       }}
     >
-      {text}
+      {edit?.typing ? (
+        <InlineInput label="Caption" value={text} onChange={edit.onType} onDone={edit.onDone} className="text-center font-hand font-bold" style={style} />
+      ) : (
+        <span className="block truncate">{text}</span>
+      )}
     </div>
   );
 }
