@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# user media (UPLOAD_DIR) — irreplaceable, back up separately
+/uploads/
