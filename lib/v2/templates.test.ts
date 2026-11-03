@@ -111,15 +111,13 @@ describe("legacy mapping", () => {
     expect(deriveTemplate("VIDEO", [{ key: "video1", width: 1280, height: 720 }])).toBe("video-wide");
   });
 
-  test("one-to-one families and book parts", () => {
+  test("one-to-one families", () => {
     expect(deriveTemplate("TRIO", [])).toBe("trio");
     expect(deriveTemplate("PHOTO_TEXT", [])).toBe("photo-text");
     expect(deriveTemplate("DUO_TEXT", [])).toBe("duo-text");
     expect(deriveTemplate("TRIO_TEXT", [])).toBe("strip-text");
     expect(deriveTemplate("TEXT", [])).toBe("letter");
     expect(deriveTemplate("QUOTE", [])).toBe("quote");
-    expect(deriveTemplate("COVER", [])).toBeNull();
-    expect(deriveTemplate("CLOSING", [])).toBeNull();
   });
 
   test("every template maps back to its own legacy family", () => {
@@ -136,7 +134,6 @@ describe("legacy mapping", () => {
   test("a stored v2 template wins; junk falls back to the legacy mapping", () => {
     expect(resolveTemplate({ template: "trio", layout: "DUO", slots: [] })).toBe("trio");
     expect(resolveTemplate({ template: "bogus", layout: "SINGLE", slots: [landscape("photo1")] })).toBe("single-wide");
-    expect(resolveTemplate({ template: "trio", layout: "COVER", slots: [] })).toBeNull();
     expect(isTemplateKey("quote")).toBe(true);
     expect(isTemplateKey("QUOTE")).toBe(false);
   });

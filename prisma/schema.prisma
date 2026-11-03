@@ -7,9 +7,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// v2: the couple's library. Holds the shared edit password and the wishlist;
-// books hang off it. (Book.editPasswordHash and WishlistItem.bookId stay until
-// the v1 cleanup is approved.)
+// The couple's library. Holds the shared edit password and the wishlist;
+// books hang off it.
 model Shelf {
   id               String         @id @default(cuid())
   title            String
@@ -27,11 +26,9 @@ model Book {
   subtitle         String?
   theme            String         @default("cream") // theme preset key
   coverImageUrl    String?
-  editPasswordHash String // bcrypt hash; plaintext known only to editors
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   pages            Page[]
-  wishlist         WishlistItem[]
 
   // v2
   shelfId     String?
@@ -48,8 +45,8 @@ model Book {
 
 model WishlistItem {
   id        String    @id @default(cuid())
-  bookId    String
-  book      Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  shelfId   String
+  shelf     Shelf     @relation(fields: [shelfId], references: [id], onDelete: Cascade)
   text      String // the activity, text only (no photos)
   done      Boolean   @default(false) // checked = struck through
   doneAt    DateTime? // when it was completed
@@ -57,11 +54,6 @@ model WishlistItem {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  // v2: wishlists belong to the shelf (bookId kept for the v1 app)
-  shelfId String?
-  shelf   Shelf?  @relation(fields: [shelfId], references: [id], onDelete: Cascade)
-
-  @@index([bookId])
   @@index([shelfId])
 }
 
@@ -70,8 +62,7 @@ model Page {
   bookId  String
   book    Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
   order   Int // 0-based position within the book
-  layout  Layout  @default(SINGLE)
-  bgStyle String? // optional per-page paper override
+  layout  Layout  @default(SINGLE) // template family; template wins when set
   slots   Slot[]
 
   // v2
@@ -94,11 +85,8 @@ model Slot {
   imageUrl       String? // PHOTO: processed image path · VIDEO: poster frame path
   thumbUrl       String? // PHOTO/VIDEO: small thumbnail / poster thumb
   videoUrl       String? // VIDEO: transcoded web-safe MP4 (H.264/AAC) path
-  aspect         String? // PHOTO/VIDEO frame format: "portrait" | "square" | "landscape" (null = square)
   caption        String? // PHOTO: hand-written caption under the photo
   text           String? // TEXT: the note/letter/quote body
-  rotation       Float    @default(0) // decorative tilt in degrees (approx -6..6)
-  tapeStyle      String? // decorative tape/sticker preset key, nullable
   dateLabel      String? // optional hand-written date stamp
   lat            Float? // PHOTO: decimal latitude (from EXIF GPS or set manually)
   lng            Float? // PHOTO: decimal longitude
@@ -120,7 +108,6 @@ model Slot {
 }
 
 enum Layout {
-  COVER // title + subtitle + optional hero photo
   SINGLE // 1 photo + caption
   DUO // 2 photos side by side + captions
   TRIO // 3-photo collage
@@ -130,7 +117,6 @@ enum Layout {
   VIDEO // 1 video in a film-strip frame + caption
   TEXT // full-page note / letter
   QUOTE // centered milestone quote
-  CLOSING // "to be continued" style ending
 }
 
 enum SlotType {

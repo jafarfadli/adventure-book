@@ -449,13 +449,9 @@ export function deriveTemplate(layout: Layout, slots: SizedSlot[]): TemplateKey 
       return "letter";
     case "QUOTE":
       return "quote";
-    case "COVER":
-    case "CLOSING":
-      return null;
   }
 }
 
 export function resolveTemplate(page: { template: string | null; layout: Layout; slots: SizedSlot[] }): TemplateKey | null {
-  if (page.layout === "COVER" || page.layout === "CLOSING") return null;
   return isTemplateKey(page.template) ? page.template : deriveTemplate(page.layout, page.slots);
 }

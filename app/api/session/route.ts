@@ -31,10 +31,10 @@ export async function POST(req: NextRequest) {
 
   const book = await prisma.book.findUnique({
     where: { slug },
-    select: { id: true, editPasswordHash: true, shelf: { select: { id: true, editPasswordHash: true } } },
+    select: { id: true, shelf: { select: { id: true, editPasswordHash: true } } },
   });
-  // v2: a book on a shelf opens with the shelf's password (one for all books)
-  const hash = book?.shelf?.editPasswordHash ?? book?.editPasswordHash ?? "";
+  // a book opens with its shelf's password (one for all books)
+  const hash = book?.shelf?.editPasswordHash ?? "";
   const valid = hash ? await bcrypt.compare(password, hash) : false;
   if (!book || !valid) {
     return NextResponse.json({ error: GENERIC_ERROR }, { status: 401 });

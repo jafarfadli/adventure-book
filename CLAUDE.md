@@ -53,7 +53,8 @@ collaboration, offline mode, PDF export, a 3D page flip.
 
 ## 3. Domain model
 
-`prisma/schema.prisma` is the source of truth. Migrations are **additive only**.
+`prisma/schema.prisma` is the source of truth. Migrations are **additive**; anything that drops data
+needs the couple's explicit OK and a `pg_dump` first (the only one so far: `drop_v1_legacy`).
 
 - **Shelf**: `title`, `editPasswordHash` (the one password), books, wishlist.
 - **Book**: `slug`, `title`, `subtitle`, `theme` (v2 theme key; legacy values are mapped), `volume`,
@@ -64,8 +65,7 @@ collaboration, offline mode, PDF export, a 3D page flip.
   `width`, `height`), crop focus (`focusX/Y`, 0..1), `caption`, `text`, dates (`takenAt` from the file,
   `dateLabel` written by the couple, `showDate`), location (`lat`, `lng`, `locationLabel`,
   `locationSource` = `"exif" | "manual"`).
-- **WishlistItem**: `text`, `done`, `doneAt`, `order`, `shelfId`, and `bookId` (legacy; new wishes
-  are filed under the shelf's first book).
+- **WishlistItem**: `text`, `done`, `doneAt`, `order`, `shelfId`.
 
 Rules the code relies on:
 
@@ -75,8 +75,6 @@ Rules the code relies on:
   come back when switching back. Anything a reader can notice — stats, month signs, map pins — counts
   only **shown** slots that **have their media**: `visibleSlots()` / `hasMedia()` in
   `lib/v2/visible.ts`.
-- v1 `COVER`/`CLOSING` pages are not stops; their content was copied into the Book fields above.
-  v2 keeps them at the two ends of the order.
 - `reorderStopsV2` rewrites the whole order in one transaction.
 
 ---
@@ -185,16 +183,14 @@ keeps the preview identical to the reader; `e2e/parity.spec.ts` compares the pix
 
 ## 7. Access and auth
 
-- One password per shelf (`Shelf.editPasswordHash`). The shelf took its hash from the original book,
-  so the password did not change; new books copy the shelf's hash.
-- `POST /api/session` `{ slug, password }`: checks the shelf's hash (the book's own if it is on no
-  shelf), then sets `ab_session` — httpOnly, `Secure` in production, `SameSite=Lax`,
+- One password per shelf (`Shelf.editPasswordHash`); books have no password of their own.
+- `POST /api/session` `{ slug, password }`: checks the hash of the book's shelf, then sets `ab_session` — httpOnly, `Secure` in production, `SameSite=Lax`,
   **`Path=/adventure`**, 30 days — holding a jose HS256 JWT `{ bookId, shelfId?, role: "editor" }`.
   The same error for a wrong password and an unknown slug. Rate-limited to 5 tries / 5 min per IP
   (`lib/rate-limit.ts`, in memory). `DELETE /api/session` clears it.
 - `lib/auth.ts`: `canEditBook(bookId)` (the token's book, or any book on the token's shelf),
-  `requireEditor(bookId)`, `requireShelfEditor(shelfId)`, `getEditorShelfId()`. A v1 token (no
-  `shelfId`) counts for its book's shelf only while the shelf's hash equals that book's hash.
+  `requireEditor(bookId)`, `requireShelfEditor(shelfId)`, `getEditorShelfId()`. A token from before
+  shelves (no `shelfId`, last issued 2026-10-29) counts for its book's shelf.
 - **Every mutating Server Action and the upload route check first, before any DB or disk side
   effect.** Public read routes never check auth.
 
@@ -248,15 +244,17 @@ tiles. Keep the attribution visible — it is a licence requirement.
 
 ---
 
-## 10. v1 is gone; legacy data stays
+## 10. v1 is gone, and so is its data
 
 - The v1 app (flip-book reader, form editor, per-book map and wishlist, the `ADVENTURE_V2` flag and
   `?v=` switch, `prisma/seed.ts`, `framer-motion`, `react-pageflip`) was removed on 2026-11-03 at the
   couple's request. Old `/book/[slug]/map` and `/book/[slug]/wishlist` links redirect to `/map` and
   `/wishlist`. To look at v1, check out a commit before that removal.
-- Its columns are still in the database and harmless. **Deferred destructive cleanup — only with the
-  user's explicit OK**: drop `Slot.rotation`, `Slot.tapeStyle`, `Slot.aspect`, `Page.bgStyle`,
-  `Book.editPasswordHash`, `WishlistItem.bookId`, the `COVER`/`CLOSING` pages and enum values.
+- The same day, with their OK, migration `drop_v1_legacy` deleted the v1 `COVER`/`CLOSING` pages
+  (renumbering `Page.order` from 0) and dropped `Slot.rotation/tapeStyle/aspect`, `Page.bgStyle`,
+  `Book.editPasswordHash`, `WishlistItem.bookId` and the two enum values. The one-shot v2 backfill
+  script went with them. The data before that is in `~/adventure-book-backups/`.
+- `Page.layout` stays: it is the template family and `deriveTemplate` falls back on it.
 
 ---
 
@@ -269,7 +267,7 @@ tiles. Keep the attribution visible — it is a licence requirement.
 - The copy's edit password is a test-only one (`dev-test-password`, set only on the copy;
   `E2E_EDIT_PASSWORD` overrides it).
 - `npm test` — Vitest, `lib/**/*.test.ts`, pure logic (templates, world layout, dates, decorations,
-  bulk grouping, edits, visibility, backfill planners).
+  bulk grouping, edits, visibility).
 - `npx playwright test` — needs the dev server on :3012; one worker, because the suites share the dev
   database and edit it (each test puts back what it changes). `playwright.config.ts` refuses to run
   against the live app. Specs: `gallery` (visual snapshots; dev server only — the baselines show real
@@ -280,11 +278,6 @@ photos from the copy, so `e2e/*-snapshots/` is gitignored and made locally with
 - **Real photos never go into the repo** (it has a GitHub remote): test images are generated with
   sharp.
 - There is no seed script: a fresh database is a restore of a `pg_dump`.
-- Backfill (idempotent; `--dry-run` prints the plan; refuses any database other than
-  `adventure_book_v2dev` without `--allow-prod`):
-  ```
-  npx tsx --env-file=.env scripts/v2/backfill.ts <media-dims|taken-at|templates|book-parts|shelf|all> [--dry-run] [--allow-prod]
-  ```
 
 ---
 
@@ -300,7 +293,7 @@ photos from the copy, so `e2e/*-snapshots/` is gitignored and made locally with
   `aria-label` and `title` (`IconButton` sets both). Visible focus states on every control.
 - **The editor preview must equal the reader**: change rendering in `components/world/` only, never
   fork it for the editor; run the parity test.
-- Keep `Page.layout` in sync with `Page.template`, keep `Page.order` contiguous, migrations additive.
+- Keep `Page.layout` in sync with `Page.template`, keep `Page.order` contiguous from 0.
 - Respect `prefers-reduced-motion`; `alt` text everywhere.
 - Hand-written paths (fetch calls, media URLs) go through `withBase()` from `lib/basePath.ts`;
   `next/link` and the router add the base path themselves.
@@ -349,10 +342,12 @@ The app is served under **`/adventure`** on the shared Funnel hostname
   1. Back up first: `pg_dump` to a dated file outside the repo, and copy `uploads/`
      (`~/adventure-book-backups/<YYYY-MM-DD-HHMM>/`).
   2. `npm install --include=dev` (the build needs dev dependencies such as Tailwind; a shell with
-     `NODE_ENV=production` would skip them), `npx prisma migrate deploy`, then `npx prisma generate`
-     (npm 11 skips package install scripts, so the client is not regenerated on its own).
-  3. Run any needed backfill with `--allow-prod` (dry-run first).
-  4. `npm run build && pm2 restart adventure-book`, then check the public URL.
+     `NODE_ENV=production` would skip them), then `npx prisma generate` (npm 11 skips package
+     install scripts, so the client is not regenerated on its own).
+  3. `npm run build`. A migration that drops columns breaks the running server's old client, so
+     then `pm2 stop adventure-book`, `npx prisma migrate deploy`, `pm2 start adventure-book`; otherwise
+     migrate first and
+     `pm2 restart adventure-book`. Check the public URL.
 - `UPLOAD_DIR` and the database dumps belong in the backup routine — the photos are irreplaceable.
 
 Public URL: `https://jafars-mac-mini.tail9e540f.ts.net/adventure`.

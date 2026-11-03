@@ -2,12 +2,9 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { toThemeKey, type ThemeKey } from "./themes";
 
-/**
- * A shelf's wishes: filed under the shelf (v2), or under one of its books
- * (v1 keeps filing them that way while it is still served).
- */
+/** A shelf's wishes. */
 export function shelfWishes(shelfId: string): Prisma.WishlistItemWhereInput {
-  return { OR: [{ shelfId }, { book: { shelfId } }] };
+  return { shelfId };
 }
 
 export type ShelfBook = {
@@ -25,7 +22,7 @@ export type ShelfBook = {
 
 export type ShelfV2 = { id: string; title: string; theme: ThemeKey; books: ShelfBook[] };
 
-/** The couple's shelf with its books in shelf order, or null before the shelf backfill. */
+/** The couple's shelf with its books in shelf order, or null when there is none yet. */
 export async function loadShelf(): Promise<ShelfV2 | null> {
   const shelf = await prisma.shelf.findFirst({
     orderBy: { createdAt: "asc" },
@@ -44,7 +41,7 @@ export async function loadShelf(): Promise<ShelfV2 | null> {
           coverFocusY: true,
           coverText: true,
           closingText: true,
-          _count: { select: { pages: { where: { layout: { notIn: ["COVER", "CLOSING"] } } } } },
+          _count: { select: { pages: true } },
         },
       },
     },

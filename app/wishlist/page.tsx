@@ -9,8 +9,8 @@ export const metadata: Metadata = { title: "Wishlist" };
 export default async function WishlistRoute() {
   const shelf = await loadShelf();
   const rows = await prisma.wishlistItem.findMany({
-    // before the shelf backfill there is one book, and every wishlist is public
-    where: shelf ? shelfWishes(shelf.id) : {},
+    // no shelf yet: nothing to list
+    where: shelf ? shelfWishes(shelf.id) : { id: { in: [] } },
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     select: { id: true, text: true, done: true, doneAt: true },
   });

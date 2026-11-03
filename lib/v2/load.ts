@@ -62,7 +62,7 @@ export function toSlotV2(s: SlotRow): SlotV2 {
   };
 }
 
-/** null for book parts (COVER/CLOSING) — they are not stops in v2. */
+/** null only for a page whose template cannot be resolved. */
 export function toPageV2(p: PageRow, bookTheme: string): PageV2 | null {
   const template = resolveTemplate(p);
   if (!template) return null;

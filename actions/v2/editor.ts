@@ -89,25 +89,11 @@ async function writeOrder(tx: Tx, ids: string[]) {
   for (const [i, pid] of ids.entries()) await tx.page.update({ where: { id: pid }, data: { order: i } });
 }
 
-/**
- * Full page order with `newIds` inserted before the stop at `index`. Book
- * parts (v1 COVER/CLOSING rows) keep their places at the two ends.
- */
+/** Full page order with `newIds` inserted before the stop at `index` (at the end past the last). */
 async function orderWithInsert(tx: Tx, bookId: string, index: number, newIds: string[]): Promise<string[]> {
-  const all = await tx.page.findMany({
-    where: { bookId, id: { notIn: newIds } },
-    orderBy: { order: "asc" },
-    select: { id: true, layout: true },
-  });
-  const stops = all.filter((p) => p.layout !== "COVER" && p.layout !== "CLOSING");
-  const before = stops[index];
+  const all = await tx.page.findMany({ where: { bookId, id: { notIn: newIds } }, orderBy: { order: "asc" }, select: { id: true } });
   const ids = all.map((p) => p.id);
-  let at: number;
-  if (before) at = ids.indexOf(before.id);
-  else {
-    const lastStop = stops[stops.length - 1];
-    at = lastStop ? ids.indexOf(lastStop.id) + 1 : all.filter((p) => p.layout === "COVER").length;
-  }
+  const at = Math.min(index, ids.length);
   return [...ids.slice(0, at), ...newIds, ...ids.slice(at)];
 }
 
@@ -232,11 +218,8 @@ const snapshotSlot = {
   imageUrl: true,
   thumbUrl: true,
   videoUrl: true,
-  aspect: true,
   caption: true,
   text: true,
-  rotation: true,
-  tapeStyle: true,
   dateLabel: true,
   lat: true,
   lng: true,
@@ -256,7 +239,6 @@ export type PageSnapshot = {
   template: string | null;
   theme: string | null;
   decorSeed: number;
-  bgStyle: string | null;
   slots: (Omit<Prisma.SlotGetPayload<{ select: typeof snapshotSlot }>, "takenAt"> & { takenAt: string | null })[];
 };
 
@@ -272,13 +254,11 @@ export async function deletePageV2(pageIdRaw: string): Promise<PageSnapshot> {
       template: true,
       theme: true,
       decorSeed: true,
-      bgStyle: true,
       book: { select: { slug: true } },
       slots: { select: snapshotSlot },
     },
   });
   await requireEditor(page.bookId);
-  if (page.layout === "COVER" || page.layout === "CLOSING") throw new Error("Book parts are not deleted from the editor");
 
   await prisma.$transaction(async (tx) => {
     await tx.page.delete({ where: { id: pageId } });
@@ -296,7 +276,6 @@ export async function deletePageV2(pageIdRaw: string): Promise<PageSnapshot> {
     template: page.template,
     theme: page.theme,
     decorSeed: page.decorSeed,
-    bgStyle: page.bgStyle,
     slots: page.slots.map((s) => ({ ...s, takenAt: s.takenAt ? s.takenAt.toISOString() : null })),
   };
 }
@@ -307,7 +286,6 @@ const snapshotSchema = z.object({
   template: templateKey.nullable(),
   theme: themeKey.nullable(),
   decorSeed: z.number().int().min(0),
-  bgStyle: z.string().max(60).nullable(),
   slots: z
     .array(
       z.object({
@@ -316,11 +294,8 @@ const snapshotSchema = z.object({
         imageUrl: z.string().regex(MEDIA_PATH_RE).nullable(),
         thumbUrl: z.string().regex(MEDIA_PATH_RE).nullable(),
         videoUrl: z.string().regex(VIDEO_PATH_RE).nullable(),
-        aspect: z.string().max(20).nullable(),
         caption: z.string().max(300).nullable(),
         text: z.string().max(5000).nullable(),
-        rotation: z.number(),
-        tapeStyle: z.string().max(40).nullable(),
         dateLabel: z.string().max(60).nullable(),
         lat: z.number().min(-90).max(90).nullable(),
         lng: z.number().min(-180).max(180).nullable(),
@@ -355,7 +330,6 @@ export async function restorePageV2(bookIdRaw: string, snapshotRaw: PageSnapshot
         template: snap.template,
         theme: snap.theme,
         decorSeed: snap.decorSeed,
-        bgStyle: snap.bgStyle,
         slots: {
           create: snap.slots.map((s) => ({ ...s, takenAt: s.takenAt ? new Date(s.takenAt) : null })),
         },
@@ -367,7 +341,7 @@ export async function restorePageV2(bookIdRaw: string, snapshotRaw: PageSnapshot
   return (await loadPages(bookId, [snap.id], book.theme))[0];
 }
 
-/** New stop order (stop ids only; book parts stay at the ends). */
+/** New stop order: every stop id of the book, once. */
 export async function reorderStopsV2(bookIdRaw: string, idsRaw: string[]) {
   const bookId = id.parse(bookIdRaw);
   const ids = z.array(id).max(2000).parse(idsRaw);
@@ -375,13 +349,12 @@ export async function reorderStopsV2(bookIdRaw: string, idsRaw: string[]) {
   const book = await prisma.book.findUniqueOrThrow({ where: { id: bookId }, select: { slug: true } });
 
   await prisma.$transaction(async (tx) => {
-    const all = await tx.page.findMany({ where: { bookId }, orderBy: { order: "asc" }, select: { id: true, layout: true } });
-    const stops = all.filter((p) => p.layout !== "COVER" && p.layout !== "CLOSING");
-    const have = new Set(stops.map((p) => p.id));
-    if (ids.length !== have.size || ids.some((x) => !have.has(x))) throw new Error("Page list out of sync; reload and try again");
-    const covers = all.filter((p) => p.layout === "COVER").map((p) => p.id);
-    const closings = all.filter((p) => p.layout === "CLOSING").map((p) => p.id);
-    await writeOrder(tx, [...covers, ...ids, ...closings]);
+    const all = await tx.page.findMany({ where: { bookId }, select: { id: true } });
+    const have = new Set(all.map((p) => p.id));
+    if (ids.length !== have.size || new Set(ids).size !== ids.length || ids.some((x) => !have.has(x))) {
+      throw new Error("Page list out of sync; reload and try again");
+    }
+    await writeOrder(tx, ids);
   });
   revalidate(book.slug);
 }

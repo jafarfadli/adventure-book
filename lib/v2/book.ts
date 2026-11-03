@@ -32,7 +32,7 @@ export async function loadBookV2(slug: string): Promise<BookV2 | null> {
 
   // v1 wishlists hang off the book; v2 moves them to the shelf (phase 5).
   const wishlist = await prisma.wishlistItem.findMany({
-    where: { done: false, ...(book.shelfId ? shelfWishes(book.shelfId) : { bookId: book.id }) },
+    where: { done: false, ...(book.shelfId ? shelfWishes(book.shelfId) : { id: { in: [] } }) },
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     take: 3,
     select: { id: true, text: true },

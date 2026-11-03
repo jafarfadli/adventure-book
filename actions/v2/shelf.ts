@@ -32,14 +32,14 @@ export async function createBookV2(titleRaw: string, themeRaw: string): Promise<
   const shelfId = await sessionShelf();
   const shelf = await prisma.shelf.findUniqueOrThrow({
     where: { id: shelfId },
-    select: { editPasswordHash: true, books: { select: { volume: true, shelfOrder: true } } },
+    select: { books: { select: { volume: true, shelfOrder: true } } },
   });
   const taken = new Set((await prisma.book.findMany({ select: { slug: true } })).map((b) => b.slug));
   const slug = uniqueSlug(slugify(title), taken);
   const volume = Math.max(0, ...shelf.books.map((b) => b.volume ?? 0)) + 1;
   const shelfOrder = Math.max(-1, ...shelf.books.map((b) => b.shelfOrder)) + 1;
   await prisma.book.create({
-    data: { slug, title, theme, volume, shelfId, shelfOrder, editPasswordHash: shelf.editPasswordHash },
+    data: { slug, title, theme, volume, shelfId, shelfOrder },
   });
   revalidatePath("/");
   return { slug };
@@ -56,11 +56,9 @@ function revalidateWishlist() {
 export async function addWishV2(textRaw: string): Promise<{ id: string; text: string; done: boolean; doneAt: string | null }> {
   const text = wishText.parse(textRaw);
   const shelfId = await sessionShelf();
-  // v1 still files wishes under a book: use the shelf's first one
-  const first = await prisma.book.findFirstOrThrow({ where: { shelfId }, orderBy: { shelfOrder: "asc" }, select: { id: true } });
   // appended after the last one (a count would collide once something is deleted)
   const { _max } = await prisma.wishlistItem.aggregate({ where: shelfWishes(shelfId), _max: { order: true } });
-  const item = await prisma.wishlistItem.create({ data: { shelfId, bookId: first.id, text, order: (_max.order ?? -1) + 1 } });
+  const item = await prisma.wishlistItem.create({ data: { shelfId, text, order: (_max.order ?? -1) + 1 } });
   revalidateWishlist();
   return { id: item.id, text: item.text, done: false, doneAt: null };
 }
@@ -70,9 +68,9 @@ async function ownWish(idRaw: string) {
   const shelfId = await sessionShelf();
   const item = await prisma.wishlistItem.findUniqueOrThrow({
     where: { id },
-    select: { id: true, shelfId: true, done: true, book: { select: { shelfId: true } } },
+    select: { id: true, shelfId: true, done: true },
   });
-  if (item.shelfId !== shelfId && item.book.shelfId !== shelfId) throw new Error("Unauthorized: not on this shelf");
+  if (item.shelfId !== shelfId) throw new Error("Unauthorized: not on this shelf");
   return item;
 }
 

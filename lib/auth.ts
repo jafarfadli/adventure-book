@@ -61,18 +61,14 @@ export async function getEditorBookId(): Promise<string | null> {
 }
 
 /**
- * The shelf a session may edit, or null. A v1 token (book only, from before
- * shelves existed) counts for the shelf its book sits on, as long as it was
- * unlocked with the shelf's password (the shelf took its hash from that
- * book), so nobody has to unlock again after the switch.
+ * The shelf a session may edit, or null. A token from before shelves existed
+ * (book only, issued until 2026-10-29, 30 days valid) counts for the shelf
+ * its book sits on: the shelf took that book's password.
  */
 async function sessionShelfId(s: SessionPayload): Promise<string | null> {
   if (typeof s.shelfId === "string") return s.shelfId;
-  const book = await prisma.book.findUnique({
-    where: { id: s.bookId },
-    select: { editPasswordHash: true, shelf: { select: { id: true, editPasswordHash: true } } },
-  });
-  return book?.shelf && book.shelf.editPasswordHash === book.editPasswordHash ? book.shelf.id : null;
+  const book = await prisma.book.findUnique({ where: { id: s.bookId }, select: { shelfId: true } });
+  return book?.shelfId ?? null;
 }
 
 export async function getEditorShelfId(): Promise<string | null> {

@@ -16,7 +16,7 @@ export default async function MapRoute() {
   const bookIndex = new Map(books.map((b, i) => [b.id, i]));
 
   const pages = await prisma.page.findMany({
-    where: { layout: { notIn: ["COVER", "CLOSING"] }, ...(shelf ? { book: { shelfId: shelf.id } } : {}) },
+    where: shelf ? { book: { shelfId: shelf.id } } : {},
     select: { ...pageSelect, book: { select: { id: true, slug: true, theme: true } } },
   });
 

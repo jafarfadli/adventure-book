@@ -9,8 +9,8 @@ export async function generateMetadata(): Promise<Metadata> {
   return shelf ? { title: shelf.title } : {};
 }
 
-// The shelf of books. Before the shelf backfill (a fresh database) there is
-// no shelf yet: go straight to the default book.
+// The shelf of books. Without a shelf (an empty database) go straight to the
+// default book.
 export default async function Home() {
   const shelf = await loadShelf();
   if (shelf && shelf.books.length > 0) {
