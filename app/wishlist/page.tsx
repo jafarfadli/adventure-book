@@ -4,6 +4,9 @@ import { getEditorShelfId } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { loadShelf, shelfWishes } from "@/lib/v2/shelf";
 
+// live data on every visit, never baked in at build time
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = { title: "Wishlist" };
 
 export default async function WishlistRoute() {

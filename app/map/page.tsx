@@ -6,6 +6,9 @@ import { pageSelect, toPageV2 } from "@/lib/v2/load";
 import { loadShelf } from "@/lib/v2/shelf";
 import { hasMedia, visibleSlots } from "@/lib/v2/visible";
 
+// live data on every visit, never baked in at build time
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = { title: "Peta kenangan" };
 
 // Every geotagged photo and video shown in any book on the shelf. Media
