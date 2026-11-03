@@ -24,7 +24,7 @@ async function makePhotos(dir: string): Promise<string[]> {
 }
 
 test("three photos become one reviewed stop, created in one go", async ({ page }) => {
-  await page.goto("/adventure/book/our-story/edit?v=2");
+  await page.goto("/adventure/book/our-story/edit");
   await page.waitForSelector("section[data-page]");
   const stops = page.locator("section[data-page]");
   const n = await stops.count();

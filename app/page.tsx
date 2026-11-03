@@ -2,27 +2,20 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Shelf } from "@/components/shelf/Shelf";
 import { getEditorShelfId } from "@/lib/auth";
-import { isV2, v2Suffix } from "@/lib/v2/flag";
 import { loadShelf } from "@/lib/v2/shelf";
 
-type Props = { searchParams: Promise<{ v?: string }> };
-
-export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  if (!isV2((await searchParams).v)) return {};
+export async function generateMetadata(): Promise<Metadata> {
   const shelf = await loadShelf();
   return shelf ? { title: shelf.title } : {};
 }
 
-// v2: the shelf of books. v1 hosts a single book: the landing page just
-// forwards to it.
-export default async function Home({ searchParams }: Props) {
-  const sp = await searchParams;
-  if (isV2(sp.v)) {
-    const shelf = await loadShelf();
-    if (shelf && shelf.books.length > 0) {
-      const canEdit = (await getEditorShelfId()) === shelf.id;
-      return <Shelf shelf={shelf} canEdit={canEdit} hrefSuffix={v2Suffix(sp.v)} />;
-    }
+// The shelf of books. Before the shelf backfill (a fresh database) there is
+// no shelf yet: go straight to the default book.
+export default async function Home() {
+  const shelf = await loadShelf();
+  if (shelf && shelf.books.length > 0) {
+    const canEdit = (await getEditorShelfId()) === shelf.id;
+    return <Shelf shelf={shelf} canEdit={canEdit} />;
   }
-  redirect(`/book/${process.env.DEFAULT_SLUG ?? "our-story"}${v2Suffix(sp.v)}`);
+  redirect(`/book/${process.env.DEFAULT_SLUG ?? "our-story"}`);
 }

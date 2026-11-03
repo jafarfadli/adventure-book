@@ -46,7 +46,6 @@ collaboration, offline mode, PDF export, a 3D page flip.
 - **jose** (session JWT), **bcryptjs** (password hash), **zod** (every input)
 - **leaflet** + **react-leaflet** (map), **@dnd-kit** (reordering stops)
 - **Vitest** (pure logic), **Playwright** with the system Chrome (E2E, visual, parity)
-- v1-only, kept with the v1 code until it is removed (§10): `framer-motion`, `react-pageflip`
 - Deploy: **PM2** + Caddy gateway + **Tailscale Funnel** on a **Mac mini M4** (§14). Media on local
   disk, no cloud storage.
 
@@ -65,13 +64,13 @@ collaboration, offline mode, PDF export, a 3D page flip.
   `width`, `height`), crop focus (`focusX/Y`, 0..1), `caption`, `text`, dates (`takenAt` from the file,
   `dateLabel` written by the couple, `showDate`), location (`lat`, `lng`, `locationLabel`,
   `locationSource` = `"exif" | "manual"`).
-- **WishlistItem**: `text`, `done`, `doneAt`, `order`, `shelfId` (v2) and `bookId` (v1; v2 files new
-  wishes under the shelf's first book too).
+- **WishlistItem**: `text`, `done`, `doneAt`, `order`, `shelfId`, and `bookId` (legacy; new wishes
+  are filed under the shelf's first book).
 
 Rules the code relies on:
 
-- Writing a template also writes the matching legacy `layout` (`TEMPLATES[t].legacy`), so the v1 app
-  keeps rendering every page.
+- Writing a template also writes the matching legacy `layout` (`TEMPLATES[t].legacy`); `deriveTemplate`
+  falls back on it when `template` is null.
 - Switching templates keeps every slot row: slots the new template has no place for are hidden, and
   come back when switching back. Anything a reader can notice — stats, month signs, map pins — counts
   only **shown** slots that **have their media**: `visibleSlots()` / `hasMedia()` in
@@ -229,13 +228,13 @@ separately**) under random UUID names. The DB stores route paths with the base p
 
 | Path | What |
 |---|---|
-| `/` | the shelf (v1: redirect to `/book/$DEFAULT_SLUG`) |
+| `/` | the shelf (no shelf yet: redirect to `/book/$DEFAULT_SLUG`) |
 | `/book/[slug]` | the world reader; `?p=<pageId>`, `?page=<order>` |
 | `/book/[slug]/edit` | the editor (redirects to unlock without a session) |
 | `/book/[slug]/unlock` | password card |
 | `/map` | every book's shown photos and videos that have coordinates; a pin opens `/book/<slug>?p=<pageId>` |
 | `/wishlist` | the shelf's wishlist (also wishes v1 filed under one of its books); read-only for visitors |
-| `/book/[slug]/map`, `/book/[slug]/wishlist` | redirect to `/map`, `/wishlist` (v1 pages under `?v=1`) |
+| `/book/[slug]/map`, `/book/[slug]/wishlist` | redirect to `/map`, `/wishlist` |
 | `/dev/gallery` | every template × theme, for development; 404 in production |
 | `/api/session`, `/api/upload`, `/api/media/[...path]` | §7, §8 |
 
@@ -249,20 +248,15 @@ tiles. Keep the attribution visible — it is a licence requirement.
 
 ---
 
-## 10. Feature flag, v1, rollback, deferred cleanup
+## 10. v1 is gone; legacy data stays
 
-- `lib/v2/flag.ts`: v2 serves when `ADVENTURE_V2=1` (server env, read per request) or with `?v=2`;
-  `?v=1` forces the old app. `v2Suffix()` keeps `?v=2` on internal links only while it is a preview.
-- **The v1 app is still in the tree as the instant rollback**: `components/{reader,editor,map,
-  wishlist,ui}`, `actions/{book,pages,slots,wishlist}.ts`, `lib/{layouts,frames,tapes,themes,
-  types}.ts`, `app/book/[slug]/wishlist/edit`. Do not extend it. Removing it (and `framer-motion`,
-  `react-pageflip`) is a follow-up once the couple have confirmed v2.
-- **Rollback**: remove `ADVENTURE_V2` from `.env`, then `pm2 restart adventure-book` (Next reads
-  `.env` at every start; keep the flag out of PM2's own env so this keeps working). The database stays
-  compatible both ways (v2 keeps `layout` in sync; v1 ignores the new columns).
-- **Deferred destructive cleanup — only with the user's explicit OK**: drop `Slot.rotation`,
-  `Slot.tapeStyle`, `Slot.aspect`, `Page.bgStyle`, `Book.editPasswordHash`, `WishlistItem.bookId`,
-  the `COVER`/`CLOSING` pages and enum values.
+- The v1 app (flip-book reader, form editor, per-book map and wishlist, the `ADVENTURE_V2` flag and
+  `?v=` switch, `prisma/seed.ts`, `framer-motion`, `react-pageflip`) was removed on 2026-11-03 at the
+  couple's request. Old `/book/[slug]/map` and `/book/[slug]/wishlist` links redirect to `/map` and
+  `/wishlist`. To look at v1, check out a commit before that removal.
+- Its columns are still in the database and harmless. **Deferred destructive cleanup — only with the
+  user's explicit OK**: drop `Slot.rotation`, `Slot.tapeStyle`, `Slot.aspect`, `Page.bgStyle`,
+  `Book.editPasswordHash`, `WishlistItem.bookId`, the `COVER`/`CLOSING` pages and enum values.
 
 ---
 
@@ -278,12 +272,14 @@ tiles. Keep the attribution visible — it is a licence requirement.
   bulk grouping, edits, visibility, backfill planners).
 - `npx playwright test` — needs the dev server on :3012; one worker, because the suites share the dev
   database and edit it (each test puts back what it changes). `playwright.config.ts` refuses to run
-  against the live app. Specs: `gallery` (visual snapshots; dev server only), `reader`, `editor`
+  against the live app. Specs: `gallery` (visual snapshots; dev server only — the baselines show real
+photos from the copy, so `e2e/*-snapshots/` is gitignored and made locally with
+`--update-snapshots`), `reader`, `editor`
   (including failed saves and undo), `parity`, `add-many`, `shelf`.
 - `npm run lint`, `npx tsc --noEmit` and `npm run build` must pass before merging.
 - **Real photos never go into the repo** (it has a GitHub remote): test images are generated with
   sharp.
-- **Never run `npx prisma db seed` against real content** — it wipes the pages.
+- There is no seed script: a fresh database is a restore of a `pg_dump`.
 - Backfill (idempotent; `--dry-run` prints the plan; refuses any database other than
   `adventure_book_v2dev` without `--allow-prod`):
   ```
@@ -321,10 +317,8 @@ NEXT_PUBLIC_BASE_PATH=/adventure
 DATABASE_URL=postgresql://.../adventure_book
 SESSION_SECRET=             # jose HS256 secret (long random)
 UPLOAD_DIR=                 # persistent media folder: this repo's ./uploads (gitignored)
-DEFAULT_SLUG=our-story      # v1 landing redirect / fallback
-SEED_EDIT_PASSWORD=         # only for prisma/seed.ts on a fresh database
+DEFAULT_SLUG=our-story      # where / goes when there is no shelf yet
 NEXT_PUBLIC_STADIA_API_KEY= # optional, domain-restricted watercolor tiles
-ADVENTURE_V2=1              # serve v2 by default; unset = v1 (rollback)
 ```
 
 ---
@@ -354,8 +348,9 @@ The app is served under **`/adventure`** on the shared Funnel hostname
 - **Release with database changes**:
   1. Back up first: `pg_dump` to a dated file outside the repo, and copy `uploads/`
      (`~/adventure-book-backups/<YYYY-MM-DD-HHMM>/`).
-  2. `npm install`, `npx prisma migrate deploy`, then `npx prisma generate` (npm 11 skips package
-     install scripts, so the client is not regenerated on its own).
+  2. `npm install --include=dev` (the build needs dev dependencies such as Tailwind; a shell with
+     `NODE_ENV=production` would skip them), `npx prisma migrate deploy`, then `npx prisma generate`
+     (npm 11 skips package install scripts, so the client is not regenerated on its own).
   3. Run any needed backfill with `--allow-prod` (dry-run first).
   4. `npm run build && pm2 restart adventure-book`, then check the public URL.
 - `UPLOAD_DIR` and the database dumps belong in the backup routine — the photos are irreplaceable.

@@ -3,7 +3,6 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import { withBase } from "./basePath";
-import { detectFormat, type FrameFormat } from "./frames";
 
 export const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
@@ -26,7 +25,7 @@ export function uploadDir(): string {
  */
 export async function processUpload(
   input: Buffer,
-): Promise<{ imageUrl: string; thumbUrl: string; aspect: FrameFormat; width: number; height: number }> {
+): Promise<{ imageUrl: string; thumbUrl: string; width: number; height: number }> {
   const id = randomUUID();
   const dir = uploadDir();
 
@@ -52,7 +51,6 @@ export async function processUpload(
   return {
     imageUrl: withBase(`/api/media/${id}.webp`),
     thumbUrl: withBase(`/api/media/${id}.thumb.webp`),
-    aspect: detectFormat(info.width, info.height),
     // v2 picks templates and crops by the stored pixel size
     width: info.width,
     height: info.height,

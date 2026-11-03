@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 // The v2 world reader against the dev copy of the book.
 
-const BOOK = "/adventure/book/our-story?v=2";
+const BOOK = "/adventure/book/our-story";
 
 async function region(page: Page) {
   const r = page.getByRole("region", { name: /geser untuk membaca/ });
@@ -29,14 +29,14 @@ test("the shut cover opens into the world, once per session", async ({ page }) =
 });
 
 test("a deep link skips the cover and starts at that stop", async ({ page }) => {
-  await page.goto(`${BOOK}&page=8`);
+  await page.goto(`${BOOK}?page=8`);
   await region(page);
   await expect(page.getByRole("button", { name: "Buka buku" })).toHaveCount(0);
   expect(await scrollX(page)).toBeGreaterThan(500);
 });
 
 test("arrow keys travel stop to stop and the far layer drifts slower", async ({ page }) => {
-  await page.goto(`${BOOK}&page=3`);
+  await page.goto(`${BOOK}?page=3`);
   const r = await region(page);
   const before = await scrollX(page);
   await r.focus();
@@ -48,7 +48,7 @@ test("arrow keys travel stop to stop and the far layer drifts slower", async ({ 
 });
 
 test("every stop of the book is on the path", async ({ page }) => {
-  await page.goto(`${BOOK}&page=3`);
+  await page.goto(`${BOOK}?page=3`);
   await region(page);
   await expect(page.locator("section[data-page]")).toHaveCount(31);
 });

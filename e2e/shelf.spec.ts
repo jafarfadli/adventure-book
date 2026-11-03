@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // wishlist and the map (dev copy only; everything changed here is put back).
 
 test("the shelf shows the book; tapping it opens the world", async ({ page }) => {
-  await page.goto("/adventure/?v=2");
+  await page.goto("/adventure/");
   const book = page.getByRole("link", { name: "Jafar & Sarah", exact: true });
   await expect(book).toBeVisible();
   await book.click();
@@ -12,7 +12,7 @@ test("the shelf shows the book; tapping it opens the world", async ({ page }) =>
 });
 
 test("an editor starts a new book, then removes it while still empty", async ({ page }) => {
-  await page.goto("/adventure/?v=2");
+  await page.goto("/adventure/");
   await page.getByRole("button", { name: "Buku baru" }).click();
   await page.getByLabel("Judul buku").fill("Vol Tes E2E");
   await page.getByRole("button", { name: "Buat buku" }).click();
@@ -20,12 +20,12 @@ test("an editor starts a new book, then removes it while still empty", async ({ 
   await expect(page.getByRole("button", { name: "Tambah halaman di sini" })).toBeVisible();
   await page.getByRole("button", { name: "Pengaturan buku" }).click();
   await page.getByRole("button", { name: "Hapus buku kosong" }).click();
-  await page.waitForURL(/\/adventure\/?(\?v=2)?$/);
+  await page.waitForURL(/\/adventure\/?$/);
   await expect(page.getByRole("link", { name: /Vol Tes E2E/ })).toHaveCount(0);
 });
 
 test("an editor renames the shelf in place, then puts the name back", async ({ page }) => {
-  await page.goto("/adventure/?v=2");
+  await page.goto("/adventure/");
   const card = page.getByRole("button", { name: /ubah judul rak/ });
   const before = ((await card.textContent()) ?? "").trim();
   await card.click();
@@ -46,7 +46,7 @@ test("an editor renames the shelf in place, then puts the name back", async ({ p
 });
 
 test("an editor changes a book's title from the shelf, then puts it back", async ({ page }) => {
-  await page.goto("/adventure/?v=2");
+  await page.goto("/adventure/");
   await page.getByRole("button", { name: "Ubah Jafar & Sarah" }).click();
   await page.getByLabel("Judul buku").fill("Judul Tes E2E");
   await page.getByLabel("Judul buku").press("Tab");
@@ -65,7 +65,7 @@ test("an editor changes a book's title from the shelf, then puts it back", async
 });
 
 test("the shared wishlist: add, tick, remove, undo, remove", async ({ page }) => {
-  await page.goto("/adventure/wishlist?v=2");
+  await page.goto("/adventure/wishlist");
   await page.getByLabel("Wish baru").fill("wish tes e2e");
   await page.getByRole("button", { name: "Tambah wish" }).click();
   const tick = page.getByRole("button", { name: "Sudah: wish tes e2e" });
@@ -82,11 +82,11 @@ test("the shared wishlist: add, tick, remove, undo, remove", async ({ page }) =>
 });
 
 test("the map pins every geotagged memory and a pin opens its stop", async ({ page }) => {
-  await page.goto("/adventure/map?v=2");
+  await page.goto("/adventure/map");
   const pins = page.locator(".leaflet-marker-icon");
   await expect(pins.first()).toBeVisible({ timeout: 20_000 });
   expect(await pins.count()).toBeGreaterThan(10);
   await pins.first().click({ force: true });
-  await page.waitForURL(/\/book\/our-story\?v=2&p=/);
+  await page.waitForURL(/\/book\/our-story\?p=/);
   await expect(page.getByRole("region", { name: /geser untuk membaca/ })).toBeVisible();
 });

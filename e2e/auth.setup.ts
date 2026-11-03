@@ -7,7 +7,7 @@ export const AUTH_FILE = "e2e/.auth/editor.json";
 const PASS = process.env.E2E_EDIT_PASSWORD ?? "dev-test-password";
 
 setup("editor session", async ({ page }) => {
-  await page.goto("/adventure/book/our-story/unlock?v=2");
+  await page.goto("/adventure/book/our-story/unlock");
   await page.getByLabel("Password buku").fill(PASS);
   await page.getByRole("button", { name: "Buka mode edit" }).click();
   await page.waitForSelector("section[data-page]");

@@ -39,15 +39,12 @@ export function World({
   book,
   initialPageId,
   initialOrder,
-  hrefSuffix = "",
 }: {
   book: BookV2;
   /** ?p=<pageId> */
   initialPageId?: string | null;
-  /** legacy ?page=<order> from v1 map links */
+  /** older ?page=<order> links */
   initialOrder?: number | null;
-  /** appended to internal links, e.g. "?v=2" while previewing */
-  hrefSuffix?: string;
 }) {
   const layout = useMemo(() => layoutWorld(book.pages, book.theme), [book.pages, book.theme]);
   const reduce = useReducedMotion();
@@ -99,16 +96,16 @@ export function World({
         onProgress={(p) => timeline.current?.setProgress(p)}
         onMetrics={setMetrics}
         onKeyDown={travelKeys(layout.stops, layout.width)}
-        wishlistHref={`/wishlist${hrefSuffix}`}
+        wishlistHref="/wishlist"
         onCloseBook={() => setBackCover(true)}
         label={`${book.title} — geser untuk membaca`}
       />
 
-      <TopChrome mapHref={`/map${hrefSuffix}`} wishlistHref={`/wishlist${hrefSuffix}`} shelfHref={`/${hrefSuffix}`} shareTitle={book.title} />
+      <TopChrome mapHref="/map" wishlistHref="/wishlist" shelfHref="/" shareTitle={book.title} />
       <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 flex items-center gap-2 [&>*]:pointer-events-auto">
         <MusicButton />
         <Timeline ref={timeline} marks={marks} onSeek={(p, smooth) => canvas.current?.seek(p, smooth)} />
-        <EditLink href={`/book/${book.slug}/edit${hrefSuffix}`} />
+        <EditLink href={`/book/${book.slug}/edit`} />
       </div>
 
       {coverOpen && <CoverOverlay book={book} reduceMotion={reduce} onDone={closeCover} label="Buka buku" />}

@@ -54,3 +54,6 @@ next-env.d.ts
 
 # Playwright session state
 /e2e/.auth/
+
+# gallery baselines are rendered with real photos from the dev copy: never commit them
+/e2e/*-snapshots/

@@ -52,12 +52,12 @@ for (const index of [0, 8, 9, 30]) {
   test(`stop ${index + 1} looks the same in the reader and the editor`, async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, storageState: "e2e/.auth/editor.json" });
     const reader = await ctx.newPage();
-    await reader.goto(`/adventure/book/our-story?v=2&page=${index + 1}`);
+    await reader.goto(`/adventure/book/our-story?page=${index + 1}`);
     await reader.waitForSelector("section[data-page]");
     const a = await stopShot(reader, index);
 
     const editor = await ctx.newPage();
-    await editor.goto("/adventure/book/our-story/edit?v=2");
+    await editor.goto("/adventure/book/our-story/edit");
     await editor.waitForSelector("section[data-page]");
     const b = await stopShot(editor, index);
 

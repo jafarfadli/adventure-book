@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 // back what it changes. The password is a test-only one set on the copy.
 
 const PASS = process.env.E2E_EDIT_PASSWORD ?? "dev-test-password";
-const EDIT = "/adventure/book/our-story/edit?v=2";
+const EDIT = "/adventure/book/our-story/edit";
 
 test.describe.configure({ mode: "serial" });
 

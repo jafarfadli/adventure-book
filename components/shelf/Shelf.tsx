@@ -79,7 +79,7 @@ function ShelfTitle({ title, canEdit, onRename }: { title: string; canEdit: bool
   );
 }
 
-export function Shelf({ shelf, canEdit, hrefSuffix }: { shelf: ShelfV2; canEdit: boolean; hrefSuffix: string }) {
+export function Shelf({ shelf, canEdit }: { shelf: ShelfV2; canEdit: boolean }) {
   const router = useRouter();
   const [title, setTitle] = useState(shelf.title);
   const [books, setBooks] = useState(shelf.books);
@@ -121,7 +121,7 @@ export function Shelf({ shelf, canEdit, hrefSuffix }: { shelf: ShelfV2; canEdit:
     setBusy(true);
     try {
       const { slug } = await createBookV2(newTitle.trim(), newTheme);
-      router.push(`/book/${slug}/edit${hrefSuffix}`);
+      router.push(`/book/${slug}/edit`);
     } finally {
       setBusy(false);
     }
@@ -145,7 +145,7 @@ export function Shelf({ shelf, canEdit, hrefSuffix }: { shelf: ShelfV2; canEdit:
             {books.map((b, i) => (
               <div key={b.id} className="relative w-[min(42vw,200px)] shrink-0" style={{ transform: `rotate(${i % 2 ? 1.5 : -1.5}deg)` }}>
                 <Link
-                  href={`/book/${b.slug}${hrefSuffix}`}
+                  href={`/book/${b.slug}`}
                   aria-label={b.title}
                   title={b.title}
                   className="block transition hover:-translate-y-2 focus-visible:-translate-y-2 focus-visible:outline-none"
@@ -181,10 +181,10 @@ export function Shelf({ shelf, canEdit, hrefSuffix }: { shelf: ShelfV2; canEdit:
             <Icon name="warning" title="Gagal menyimpan" />
           </span>
         )}
-        <Link href={`/map${hrefSuffix}`} aria-label="Peta kenangan" title="Peta kenangan" className="inline-grid h-10 w-10 place-items-center rounded-full bg-[#fffaf5]/95 text-[#2b2326] shadow-[0_2px_8px_rgba(40,10,30,0.2)]">
+        <Link href="/map" aria-label="Peta kenangan" title="Peta kenangan" className="inline-grid h-10 w-10 place-items-center rounded-full bg-[#fffaf5]/95 text-[#2b2326] shadow-[0_2px_8px_rgba(40,10,30,0.2)]">
           <Icon name="map" />
         </Link>
-        <Link href={`/wishlist${hrefSuffix}`} aria-label="Wishlist" title="Wishlist" className="inline-grid h-10 w-10 place-items-center rounded-full bg-[#fffaf5]/95 text-[#2b2326] shadow-[0_2px_8px_rgba(40,10,30,0.2)]">
+        <Link href="/wishlist" aria-label="Wishlist" title="Wishlist" className="inline-grid h-10 w-10 place-items-center rounded-full bg-[#fffaf5]/95 text-[#2b2326] shadow-[0_2px_8px_rgba(40,10,30,0.2)]">
           <Icon name="spark" />
         </Link>
       </div>
@@ -193,7 +193,7 @@ export function Shelf({ shelf, canEdit, hrefSuffix }: { shelf: ShelfV2; canEdit:
       </div>
       {!canEdit && books[0] && (
         <Link
-          href={`/book/${books[0].slug}/edit${hrefSuffix}`}
+          href={`/book/${books[0].slug}/edit`}
           aria-label="Mode edit"
           title="Mode edit"
           className="absolute right-3 bottom-3 z-30 inline-grid h-10 w-10 place-items-center rounded-full bg-[#fffaf5]/95 text-[#2b2326] shadow-[0_2px_8px_rgba(40,10,30,0.2)]"
