@@ -260,12 +260,13 @@ tiles. Keep the attribution visible — it is a licence requirement.
 
 ## 11. Development and tests
 
-- **Never develop or test against the live database or the live `uploads/`.** Work on a copy: database
-  `adventure_book_v2dev` (a `pg_dump` of the live one; the admin database is `template1` — there is no
-  `postgres` database), its own uploads copy, and `next dev -p 3012`. The redesign was built in the
-  worktree `../adventure-book-v2` (branch `v2`) set up exactly this way.
-- The copy's edit password is a test-only one (`dev-test-password`, set only on the copy;
-  `E2E_EDIT_PASSWORD` overrides it).
+- **Never develop or test against the live database or the live `uploads/`.** Work on a copy: a git
+  worktree outside this folder with its own `.env` pointing at a copied database (e.g.
+  `createdb --maintenance-db=template1 adventure_book_dev` + `pg_restore` of a fresh `pg_dump`; the
+  admin database is `template1`, there is no `postgres` database), its own copy of `uploads/`, and
+  `next dev -p 3012`. Remove it when done (`git worktree remove`, `dropdb`).
+- Set a test-only edit password on the copy's shelf (the e2e suite defaults to `dev-test-password`;
+  `E2E_EDIT_PASSWORD` overrides it). Never on the live shelf.
 - `npm test` — Vitest, `lib/**/*.test.ts`, pure logic (templates, world layout, dates, decorations,
   bulk grouping, edits, visibility).
 - `npx playwright test` — needs the dev server on :3012; one worker, because the suites share the dev
